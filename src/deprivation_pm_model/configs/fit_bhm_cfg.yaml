@@ -1,0 +1,91 @@
+project:
+  wd: "/home/users/cho00/fire-pm-dep/src/deprivation_pm_model"
+  data_dir: "/work/scratch-pw4/cho00/data/spatial"
+  model_save_dir: "/work/scratch-pw4/cho00/data/spatial/deprivation_bhm"
+  results_out_dir: "/home/users/cho00/fire-pm-dep/outputs/deprivation_pm_model"
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/R/share/proj"
+  cmdstan_path: "/home/users/cho00/miniconda3/envs/R/bin/cmdstan"
+
+mcmc:
+  chains: 8
+  iter: 5000
+  warmup: 2000
+  threads: 12
+  adapt_delta: 0.95
+
+priors:
+  beta_sd: 10
+  scale_dist: "cauchy"
+
+data:
+  se_indicators:
+    - "edu_mean_years"
+    - "imp_san_access_pct"
+    - "log_GDP_pc"
+    - "stunting_pct_u5"
+    - "child_dep_pct"
+  outcome: "fire_PM25"
+  centre_year: true
+  scale_PC1: true
+
+models:
+  original_model:
+    description: "No grid-level REs"
+    formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (1 + PC1 * urban_rural_cat + year | country)
+    has_country_intercept: true
+    has_country_year: true
+    has_grid_intercept: false
+    has_grid_year: false
+    nested_grid: false
+
+  nested_grid_int_slope_model:
+    description: "Nested grid (intercept + year slope)"
+    formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (1 + PC1 * urban_rural_cat + year | country) +
+        (1 + year | country:grid_id)
+    has_country_intercept: true
+    has_country_year: true
+    has_grid_intercept: true
+    has_grid_year: true
+    nested_grid: true
+
+  non_nested_grid_int_slope_model:
+    description: "Non-nested grid (intercept + year slope)"
+    formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (0 + PC1 * urban_rural_cat | country) +
+        (1 + year | grid_id)
+    has_country_intercept: false
+    has_country_year: false
+    has_grid_intercept: true
+    has_grid_year: true
+    nested_grid: false
+
+  nested_grid_int_only_model:
+    description: "Nested grid random intercept only"
+    formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (1 + PC1 * urban_rural_cat + year | country) +
+        (1 | country:grid_id)
+    has_country_intercept: true
+    has_country_year: true
+    has_grid_intercept: true
+    has_grid_year: false
+    nested_grid: true
+
+  non_nested_grid_int_only_model:
+    description: "Non-nested grid random intercept only"
+    formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (0 + PC1 * urban_rural_cat + year | country) +
+        (1 | grid_id)
+    has_country_intercept: false
+    has_country_year: false
+    has_grid_intercept: true
+    has_grid_year: false
+    nested_grid: false
