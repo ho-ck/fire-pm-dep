@@ -1,0 +1,13 @@
+project:
+  wd: "/home/users/cho00/fire-pm-dep/src/transported_pm_model"  # maybe not needed
+  data_dir: "/work/scratch-pw4/cho00/data/spatial/transported_GFED_emissions_regional"
+  model_save_dir: "/work/scratch-pw4/cho00/data/spatial/transported_pm_model"
+  results_out_dir: "/home/users/cho00/fire-pm-dep/outputs/deprivation_pm_model"  # NOTE: maybe this isn't needed in this config (but useful for results / kfcv etc.)
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/inla/share/proj"
+
+data:
+  years: { start: 2000, end: 2017 }
+  adj_path: "/work/scratch-pw4/cho00/data/spatial/transported_pm_model/afr.adj" # path to adjacency matrix
+

@@ -69,3 +69,11 @@ load_data_and_wrangle <- function(filepath, years_sel = 2000:2017) {
 
     data
 }
+
+
+# --- Logging helper -----------------------------------------------------
+logging <- function(...) {
+    ts <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+    message(sprintf("[%s] %s", ts, paste(..., collapse = " ")))
+    flush.console()
+}

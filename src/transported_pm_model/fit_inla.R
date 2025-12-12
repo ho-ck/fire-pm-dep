@@ -12,42 +12,56 @@ suppressPackageStartupMessages({
     library(sf)
     library(spdep)
     library(INLA)
+    library(yaml)
 })
 
-# --- Paths & environment ------------------------------------------------
+# --- Parse yaml arg -----------------------------------------------------
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) != 1) {
+    stop("Usage: Rscript fit_inla.R configs/fit_inla_cfg.yaml",
+         call. = FALSE)
+}
+config_file  <- args[1]
+
+# --- Load config and set environment ------------------------------------
 root <- rprojroot::find_root(rprojroot::has_file(".gitignore")) # project root has a .gitignore # nolint
+cfg <- yaml::read_yaml(file.path(
+    root, "src/transported_pm_model", config_file))
 
-Sys.setenv(PROJ_DATA = "/home/users/cho00/miniconda3/envs/inla/share/proj")
+# Environment & paths
+Sys.setenv(PROJ_DATA = cfg$environment$proj_data)
 
-data_path <- "/work/scratch-pw4/cho00/data/spatial"
-model_save_dir   <- file.path(data_path, "transported_pm_model")
-
+data_dir        <- cfg$project$data_dir
+model_save_dir  <- cfg$project$model_save_dir
 if (!dir.exists(model_save_dir)) {
     dir.create(model_save_dir, recursive = TRUE)
 }
 
 # Source helper functions
-source(file.path(root, "src/transported_pm_model", "utils/utils_fit_inla.R" ))
+source(file.path(root, "src/transported_pm_model", "utils/utils_fit_inla.R"))
+source(file.path(root, "src/transported_pm_model", "utils/utils_adj_matrix.R"))
 
 # --- Load PM & GFED emissions (monthly) data and wrangle ----------------
-data <- load_data_and_wrangle(
-    file.path(data_path, "transported_GFED_emissions_regional"),
-    years_sel = 2000:2017
-)
+yrs  <- cfg$data$years
+logging("Loading data for years:", yrs$start, "-", yrs$end)
 
-# --- Build sf object & adjacency matrix ---------------------------------
-sf_data <- data %>%
-    mutate(geometry = sf::st_as_sfc(geometry)) %>%
-    st_as_sf(crs = 4326)
+data <- load_data_and_wrangle(data_dir, 
+                              years_sel = yrs$start : yrs$end )
 
-sf_unique <- sf_data %>%
-    group_by(grid_id) %>%
-    slice(1)
+# --- Build adjacency matrix if doesn't already exist --------------------
+adj_path <- cfg$data$adj_path
 
-nb <- poly2nb(sf_unique, row.names = sf_unique$grid_id, queen = TRUE)
+if (!file.exists(adj_path)) {
+    logging("Adjacency matrix file not found. Creating:", adj_path)
 
-adj_path <- file.path(model_save_dir, "afr.adj")
-nb2INLA(file = adj_path, nb = nb)   # save adj matrix
+    nb <- create_nb_list(data, crs = 4326)
+    nb2INLA(file = adj_path, nb = nb)   # save adj matrix
+
+    logging("Saved adjacency matrix to", adj_path)
+} else {
+    logging("Adjacency matrix already exists at:", adj_path, "\nSkipping...")
+}
+
 
 # --- Standardise predictors ---------------------------------------------
 data_scaled <- data %>%
@@ -69,6 +83,8 @@ hyper_sigma <- list(
 )
 
 # --- Fit INLA model -----------------------------------------------------
+logging("Fitting INLA model...")
+
 formula <- fire_PM25 ~
     emis_0_20km + emis_20_100km + emis_100_200km + emis_200_350km +
     emis_350_500km + emis_500_750km + emis_750_1000km +
@@ -88,6 +104,24 @@ model <- inla(
     verbose = TRUE
 )
 
+logging("Model fitting complete. Saving RDS...")
+
 saveRDS(model, file.path(model_save_dir, "inla_model.rds"))
 
-print("Done!")
+logging("Saved model to:", file.path(model_save_dir, "inla_model.rds"))
+logging("Done!")
+
+
+
+
+# sf_data <- data %>%
+#     mutate(geometry = sf::st_as_sfc(geometry)) %>%
+#     st_as_sf(crs = 4326)
+
+# sf_unique <- sf_data %>%
+#     group_by(grid_id) %>%
+#     slice(1)
+
+# nb <- poly2nb(sf_unique, row.names = sf_unique$grid_id, queen = TRUE)
+
+# adj_path <- file.path(model_save_dir, "afr.adj")

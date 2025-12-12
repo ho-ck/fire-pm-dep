@@ -17,7 +17,7 @@ conda activate inla
 # Script directory
 cd /home/users/cho00/fire-pm-dep/src/transported_pm_model
 
-echo "Running INLA model..."
+echo "Starting INLA model script..."
 
 # Run Rscript to fit INLA BYM2 model
-Rscript fit_inla.R
+Rscript fit_inla.R configs/fit_inla_cfg.yaml

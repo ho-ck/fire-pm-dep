@@ -33,8 +33,8 @@ cfg <- yaml::read_yaml(file.path(
 Sys.setenv(PROJ_DATA = cfg$environment$proj_data)
 set_cmdstan_path(cfg$environment$cmdstan_path)
 
-data_dir  <- cfg$project$data_dir
-model_save_dir <- cfg$project$model_save_dir
+data_dir        <- cfg$project$data_dir
+model_save_dir  <- cfg$project$model_save_dir
 if (!dir.exists(model_save_dir)) {
     dir.create(model_save_dir, recursive = TRUE)
 }
@@ -65,7 +65,7 @@ message("Running model: ", model_choice, " (", model_cfg$description, ")")
 
 # --- Load data -----------------------------------------------------------
 df <- readr::read_csv(
-    file.path(data_dir, "descriptive_stats_GDP_pc/df_af_annual.csv"),
+    file.path(data_dir, "descriptive_stats_GDP_pc/df_af_annual.csv"),   # TODO: update this so that the full path to the CSV is in the config file. that way it is easier to use a differnet input dataset, i.e., where the outcome is local_fire_PM25 (or transported etc.)
     show_col_types = FALSE
 )
 
