@@ -21,7 +21,7 @@ create_nb_list <- function(data, crs = 4326) {
 
     # Convert to sf
     sf_data <- data %>%
-        mutate(geometry = !!try_sfc) %>% 
+        dplyr::mutate(geometry = !!try_sfc) %>% 
         sf::st_as_sf(crs = crs)
 
     # Unique locations (grids)

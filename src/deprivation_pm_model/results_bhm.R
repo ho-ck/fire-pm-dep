@@ -59,7 +59,7 @@ message("Post-processing model: ", model_choice,
         " (", model_cfg$description, ")")
 
 # ---- 0.5 Output directory ----------------------------------------------
-out_dir <- file.path(cfg$project$results_out_dir, model_choice)
+out_dir <- file.path(cfg$project$results_out_dir, model_choice) # TODO: use the config filename as the dirname for the outputs
 if (!dir.exists(out_dir)) {
     dir.create(out_dir, recursive = TRUE)
 }

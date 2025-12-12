@@ -3,7 +3,7 @@
 # - Construct adjacency matrix
 # - Fit BYM2 INLA model and save output
 # Usage:
-#   Rscript fit_inla.R
+#   Rscript fit_inla.R configs/fit_inla_cfg.yaml
 # Date created: 11/12/2025
 
 # --- Setup & libraries --------------------------------------------------
@@ -110,18 +110,3 @@ saveRDS(model, file.path(model_save_dir, "inla_model.rds"))
 
 logging("Saved model to:", file.path(model_save_dir, "inla_model.rds"))
 logging("Done!")
-
-
-
-
-# sf_data <- data %>%
-#     mutate(geometry = sf::st_as_sfc(geometry)) %>%
-#     st_as_sf(crs = 4326)
-
-# sf_unique <- sf_data %>%
-#     group_by(grid_id) %>%
-#     slice(1)
-
-# nb <- poly2nb(sf_unique, row.names = sf_unique$grid_id, queen = TRUE)
-
-# adj_path <- file.path(model_save_dir, "afr.adj")

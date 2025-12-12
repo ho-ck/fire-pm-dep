@@ -1,6 +1,6 @@
 project:
   wd: "/home/users/cho00/fire-pm-dep/src/deprivation_pm_model"
-  data_filepath: "/work/scratch-pw4/cho00/data/spatial/descriptive_stats_GDP_pc/df_af_annual.csv"
+  data_filepath: "/work/scratch-pw4/cho00/data/spatial/transported_pm_model/df_af_annual_loc_tp.csv"
   model_save_dir: "/work/scratch-pw4/cho00/data/spatial/deprivation_bhm"
   results_out_dir: "/home/users/cho00/fire-pm-dep/outputs/deprivation_pm_model"
 
@@ -9,9 +9,9 @@ environment:
   cmdstan_path: "/home/users/cho00/miniconda3/envs/R/bin/cmdstan"
 
 mcmc:
-  chains: 8
-  iter: 5000
-  warmup: 2000
+  chains: 4
+  iter: 15000
+  warmup: 5000
   threads: 12
   adapt_delta: 0.95
 
@@ -26,7 +26,7 @@ data:
     - "log_GDP_pc"
     - "stunting_pct_u5"
     - "child_dep_pct"
-  outcome: "fire_PM25"
+  outcome: "attr_fire_PM25_emis_100_2000km"  # beyond 100km attributable PM
   centre_year: true
   scale_PC1: true
 
