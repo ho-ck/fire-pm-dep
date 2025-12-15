@@ -46,28 +46,11 @@ summarise_draws <- function(
         )
 }
 
-# summarise_slopes <- function(
-#     draws_df, pivot_cols = c("rural", "urban"), names_to = "urban_rural_cat",
-#     values_to = "estimate"
-# ) {
-#     # Returns a marginaleffects style posterior summary
-#     draws_df %>%
-#         pivot_longer(
-#             all_of(pivot_cols),
-#             names_to = names_to,
-#             values_to = values_to
-#         ) %>%
-#         group_by(country, term, !!sym(names_to)) %>%
-#         summarise(
-#             summarise_posterior(!!sym(values_to)),
-#             .groups = "drop"
-#         )
-# }
 
 # --- Extract draws PC1 slopes in urban & rural --------------------------------
 # Returns a dataframe with columns:
 # .draw | country | term | rural | urban
-#   1.  |  "Chad" | "PC1"|  -0.5 | -0.1
+#   1   |  "Chad" | "PC1"|  -0.5 | -0.1
 # Where `rural` is the PC1 slope in rural areas, etc.
 # Also includes global pooled U/R effects, with `country` as "Pooled, all countries"    #nolint
 extract_pc1_draws_ur <- function(draws) {
@@ -200,19 +183,30 @@ compute_pw_pc1_draws <- function(pc1_draws_ur, df) {
 
 # --- Extract draws of country-level random intercept and year slope -----------
 # Output draws df with columns:
-# .draw | country | intercept | year_slope
+# .draw | country | Intercept | year
 extract_country_re_draws <- function(draws) {
+    has_country_re  <- any(grepl(
+        "^r_country:grid_id\\[.*Intercept]|^r_country:grid_id\\[.*year]", 
+        names(draws)
+    ))
+
+    # If model doesn't have country-level random Intercept + year slopes, 
+    # return NULL (e.g, for non-nested grid RE model)
+    if (!has_country_re) {
+        return(NULL)
+    }
+
     # ---- Intercepts ----------------------------------------------------------
     intercepts <- draws %>%
         select(.draw, matches("^r_country\\[.*Intercept]")) %>%
         pivot_longer(
-        - .draw,
-        names_to  = "country",
-        values_to = "Intercept",
-        names_transform = ~ str_replace_all(
-            str_remove_all(.x, "r_country\\[|,Intercept\\]"),
-            "\\.", " "
-        )
+            - .draw,
+            names_to  = "country",
+            values_to = "Intercept",
+            names_transform = ~ str_replace_all(
+                str_remove_all(.x, "r_country\\[|,Intercept\\]"),
+                "\\.", " "
+            )
         )
 
     # ---- Year slopes ---------------------------------------------------------
@@ -242,12 +236,12 @@ extract_country_re_draws <- function(draws) {
             )
         )
 
-    re_draws
+    return(re_draws)
 }
 
-# --- Extract draws of country-level random intercept and year slope -----------
+# --- Extract draws of grid-level random Intercept and year slope -----------
 # Output draws df with columns:
-# .draw | country | grid_id | intercept | year_slope
+# .draw | grid_id | Intercept | year
 extract_grid_re_draws <- function(draws) {
     
     has_nested_grid     <- any(grepl("^r_country:grid_id\\[", names(draws)))
@@ -265,7 +259,7 @@ extract_grid_re_draws <- function(draws) {
         pivot_longer(
             - .draw,
             names_to = "country_grid",
-            values_to = "intercept",
+            values_to = "Intercept",
             names_transform = ~ str_remove_all(
                 .x, "r_country:grid_id\\[|,Intercept\\]"
             )
@@ -281,7 +275,7 @@ extract_grid_re_draws <- function(draws) {
         pivot_longer(
             - .draw,
             names_to = "country_grid",
-            values_to = "year_slope",
+            values_to = "year",
             names_transform = ~ str_remove_all(
                 .x, "r_country:grid_id\\[|,year\\]"
             )
@@ -305,7 +299,7 @@ extract_grid_re_draws <- function(draws) {
         pivot_longer(
             - .draw,
             names_to  = "grid_id",
-            values_to = "intercept",
+            values_to = "Intercept",
             names_transform = ~ str_remove_all(
                 .x, "r_grid_id\\[|,Intercept\\]"
             )
@@ -316,7 +310,7 @@ extract_grid_re_draws <- function(draws) {
         pivot_longer(
             - .draw,
             names_to  = "grid_id",
-            values_to = "year_slope",
+            values_to = "year",
             names_transform = ~ str_remove_all(
                 .x, "r_grid_id\\[|,year\\]"
             )

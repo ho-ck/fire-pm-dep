@@ -147,7 +147,7 @@ if (!is.null(country_re_draws)) {
 grid_re_draws <- extract_grid_re_draws(draws)
 if (!is.null(grid_re_draws)) {
     grid_re <- summarise_draws(
-        grid_re_draws, group_vars = c("country", "grid_id"), 
+        grid_re_draws, group_vars = c("grid_id"), 
         estimands = c("Intercept", "year")
     )
 } else { grid_re <- NULL }

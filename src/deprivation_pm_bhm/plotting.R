@@ -50,7 +50,7 @@ build_forestplot_map_panel <- function(
             position = position_dodge(width = 0.5)
         ) +
         scale_color_manual(values = c(
-            "Pooled" = "#366A9FFF", # blue-ish (mako)
+            "pooled" = "#366A9FFF", # blue-ish (mako)
             "Rural"  = "#018571",   # teal
             "Urban"  = "#a6611a"    # brown
         )) +
