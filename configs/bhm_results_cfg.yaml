@@ -1,0 +1,38 @@
+# Config file for original model: no grid-level REs, fire_PM25 as output.
+project:
+  data_filepath: "/work/scratch-pw4/cho00/data/spatial/descriptive_stats_GDP_pc/df_af_annual.csv"
+  nat_bounds_filepath: "/work/scratch-pw4/cho00/data/spatial/nat_boundaries/WB_countries_Admin0_10m"
+  model_save_dir: "/work/scratch-pw4/cho00/data/spatial/deprivation_bhm"
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/R/share/proj"
+  cmdstan_path: "/home/users/cho00/miniconda3/envs/R/bin/cmdstan"
+
+mcmc:
+  chains: 4
+  iter: 15000
+  warmup: 5000
+  threads: 12
+  adapt_delta: 0.95
+
+priors:
+  beta_sd: 10
+  scale_dist: "cauchy"
+
+data:
+  se_indicators:
+    - "edu_mean_years"
+    - "imp_san_access_pct"
+    - "log_GDP_pc"
+    - "stunting_pct_u5"
+    - "child_dep_pct"
+  centre_year: true
+  scale_PC1: true
+
+model:
+  name: "original_model"
+  description: "No grid-level REs"
+  outcome: "fire_PM25"
+  formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (1 + PC1 * urban_rural_cat + year | country)
