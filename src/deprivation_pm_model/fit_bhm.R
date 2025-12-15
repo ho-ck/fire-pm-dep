@@ -1,3 +1,8 @@
+# TODO 12/12/2025 at some point: maybe restructure such that there is 1 config per model run, which
+# just contains the formula for that run, dataset, MCMC params etc. Then if I want an array job,
+# I can use the array indexing to read from a list of configs etc. Then don't have to magically index
+# one of the formulae within a full config.
+
 # Fit deprivation-PM2.5 Bayesian hierarchical models
 # - Load data & do PCA to construct deprivation index
 # - Estimate model as specified in config file and save to RDS file

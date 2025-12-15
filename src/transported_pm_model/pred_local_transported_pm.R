@@ -105,7 +105,7 @@ result_data_annual <- result_data_annual %>%
 
 # --- Group into within/beyond 100km -------------------------------------
 result_data_annual <- result_data_annual %>% 
-    mutate(
+    mutate( # CHRIS NOTE / TODO: this is ugly and messes up regex matching later -- maybe just local_fire_PM25 and transported_fire_PM25?
         attr_fire_PM25_emis_0_100km = 
             attr_fire_PM25_emis_0_20km + attr_fire_PM25_emis_20_100km,
         attr_fire_PM25_emis_100_2000km = 
