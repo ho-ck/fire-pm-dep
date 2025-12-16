@@ -31,15 +31,15 @@ save_brms_diagnostics <- function(model,
     if (save_trace) {
         trace_plots <- plot(model)
         for (i in seq_along(trace_plots)) {
-        ggplot2::ggsave(
-            filename = file.path(
-            out_dir,
-            sprintf("mcmc_trace_%02d.png", i)
-            ),
-            plot = trace_plots[[i]],
-            width = 8,
-            height = 6
-        )
+            ggplot2::ggsave(
+                filename = file.path(
+                out_dir,
+                sprintf("mcmc_trace_%02d.png", i)
+                ),
+                plot = trace_plots[[i]],
+                width = 8,
+                height = 6
+            )
         }
     }
 }

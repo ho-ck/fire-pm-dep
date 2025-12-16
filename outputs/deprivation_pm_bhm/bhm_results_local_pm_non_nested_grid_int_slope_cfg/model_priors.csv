@@ -1,0 +1,20 @@
+prior,class,coef,group,resp,dpar,nlpar,lb,ub,source
+"normal(0, 10)",b,,,,,,,,user
+,b,Intercept,,,,,,,default
+,b,PC1,,,,,,,default
+,b,PC1:urban_rural_caturban,,,,,,,default
+,b,urban_rural_caturban,,,,,,,default
+,b,year,,,,,,,default
+lkj_corr_cholesky(1),L,,,,,,,,default
+,L,,country,,,,,,default
+,L,,grid_id,,,,,,default
+"cauchy(0, 1)",sd,,,,,,0,,user
+,sd,,country,,,,,,default
+,sd,PC1,country,,,,,,default
+,sd,PC1:urban_rural_caturban,country,,,,,,default
+,sd,urban_rural_catrural,country,,,,,,default
+,sd,urban_rural_caturban,country,,,,,,default
+,sd,,grid_id,,,,,,default
+,sd,Intercept,grid_id,,,,,,default
+,sd,year,grid_id,,,,,,default
+"cauchy(0, 1)",sigma,,,,,,0,,user

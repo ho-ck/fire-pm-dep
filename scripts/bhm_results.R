@@ -83,16 +83,12 @@ nat_bounds  <- sf::read_sf( cfg$project$nat_bounds_filepath ) %>%
 df  <- readr::read_csv( data_filepath )
 
 # Do PCA (only for rows with complete SE data)
-df_pca  <- compute_pca(df, cfg$data$se_indicators)$data # 523,116 rows
+df_pca  <- compute_pca(df, cfg$data$se_indicators)$data
 
-# Join PCs back onto df
-df  <- left_join(
-    df,
-    df_pca %>% select(lon, lat, year, paste0("PC", 1:5)),
-    by = c("year", "lon", "lat")
-)
+# Join PCs back onto df (helper funct)
+df  <- prepare_analysis_data(df, df_pca)
 
-# --- 1.2 Load model -----------------------------------------------------
+# --- 1.2 Load model -----------------------------------------------------------
 logging("Loading model...")
 
 model_file <- build_modelfile(
@@ -108,9 +104,9 @@ model   <- readRDS(model_file)
 logging("Saving model diagnostics to output dir: ", out_dir)
 save_brms_diagnostics(model, out_dir, save_trace = TRUE, save_stan = TRUE)
 
-# --- 1.3 Posterior draws and marginal effects ---------------------------
+# --- 1.3 Posterior draws and marginal effects ---------------------------------
 logging("Extracting and summarising posterior draws...")
-draws <- as_draws_df(model)
+draws   <- as_draws_df(model)
 
 # PC1 effects in U & R (draws)
 pc1_draws_ur <- extract_pc1_draws_ur(draws)      
@@ -126,7 +122,7 @@ slopes_ur <- summarise_draws(
 # Post-stratification: p-w avg of U & R PC1 draws
 pc1_draws_pw_avg <- compute_pw_pc1_draws(pc1_draws_ur, df)
 
-# Posterior summary of U/R pooled effects
+# Posterior summary of U/R pooled effects draws
 slopes_pw_avg <- summarise_draws( 
     pc1_draws_pw_avg, 
     pivot = TRUE, pivot_cols = c("pooled"),
@@ -177,7 +173,7 @@ ggsave(
     bg       = "white"
 )
 
-# --- 2.3 Maps of country-level random intercept and year slope ----------
+# --- 2.3 Maps of country-level random intercept and year slope ----------------
 if (!is.null(country_re)) {
     logging("Plotting country-level random intercept + year slope...")
 
@@ -205,7 +201,7 @@ if (!is.null(country_re)) {
     }
 }
 
-# --- 2.4 Maps of grid-level random effects ------------------------------
+# --- 2.4 Maps of grid-level random effects ------------------------------------
 if (!is.null(grid_re)) {
     logging("Plotting grid-level random intercept + year slope...")
 

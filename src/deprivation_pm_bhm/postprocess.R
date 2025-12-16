@@ -38,8 +38,7 @@ summarise_draws <- function(
         group_by(across(all_of(group_vars))) %>%
         summarise(
             across(
-                all_of(c(estimands)),
-                ~ summarise_posterior(.x),
+                all_of(c(estimands)), ~ summarise_posterior(.x),
                 .unpack = ifelse(pivot, "{inner}", "{outer}_{inner}")  
             ),
             .groups = "drop"
@@ -58,7 +57,7 @@ extract_pc1_draws_ur <- function(draws) {
     b_PC1         <- draws %>% select(.draw, b_PC1)
     b_PC1_x_urban <- draws %>% select(.draw, `b_PC1:urban_rural_caturban`)
 
-    # Country random effects
+    # Country PC1 random slopes
     r_country_PC1 <- draws %>%
         select(.draw, matches("^r_country\\[.*PC1]")) %>%
             pivot_longer(
@@ -71,6 +70,7 @@ extract_pc1_draws_ur <- function(draws) {
             )
         )
 
+    # Interaction term
     r_country_PC1_x_urban <- draws %>%
         select(.draw, matches("^r_country\\[.*PC1:urban_rural_caturban]")) %>%
             pivot_longer(
@@ -91,7 +91,7 @@ extract_pc1_draws_ur <- function(draws) {
             country = "Pooled, all countries",
             term = "PC1",
             rural = b_PC1,
-            urban = b_PC1 + `b_PC1:urban_rural_caturban`
+            urban = b_PC1 + `b_PC1:urban_rural_caturban`  # 'base' + interaction
         )
 
     # ---- Country -----------------------------------------------------------
@@ -103,7 +103,7 @@ extract_pc1_draws_ur <- function(draws) {
             .draw,
             country,
             term = "PC1",
-            rural = b_PC1 + r_country_PC1,
+            rural = b_PC1 + r_country_PC1,  # FE + random slope
             urban = b_PC1 + `b_PC1:urban_rural_caturban` +
                     r_country_PC1 + r_country_PC1_x_urban
         )

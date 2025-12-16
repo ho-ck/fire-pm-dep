@@ -22,8 +22,31 @@ compute_pca <- function(df, se_indicators) {
     list(data = df_aug, pca = pca)
 }
 
+# --- Helper: prepare data for analysis / post-processing of model -------------
+# NOTE 16/12: the annual PM and SE data 'df' has a grid_id column from 
+# upstream data downloading/wrangling scripts. This is inconsistent with the 
+# grid_id's used in the deprivation-PM BHM, which was fitted to rows with non-NA
+# PC1 (i.e., complete socioeconomic data). Thus, re-create the grid_id's of 'df'
+# to match the model data, i.e., grid_id's for non-NA PC1.
+prepare_analysis_data <- function(df, df_pca) {
+    df_pca  <- df_pca %>%   # contains only non-NA PC1 (523,116 rows)
+        group_by(lon, lat) %>% 
+        mutate(grid_id = cur_group_id()) %>%
+        ungroup()
+
+    # Join PCs back onto df
+    df  <- df %>% 
+        select(-grid_id) %>%    # remove pre-existing grid IDs, replace with the IDs consistent with the model # nolint
+        left_join(    
+            df_pca %>% select(lon, lat, year, grid_id, paste0("PC", 1:5)),
+            by = c("year", "lon", "lat")
+        )
+    df  # 828600 rows (523,116 with non-NA PC1)
+}
+
 
 # --- Helper: prepare data for model (scale PC1 and centre year) ---------
+# TODO: probably update to take scale_pc1 and centre_year as params rather than the config (more clear)
 prepare_model_data <- function(data, model_formula, cfg_data = list()) {
     data <- data %>%
         mutate(urban_rural_cat = as.factor(urban_rural)) %>% 

@@ -23,13 +23,14 @@ build_forestplot_map_panel <- function(
             ),
             country = forcats::fct_relevel(country, "Pooled, all countries"),
             urban_rural_cat = recode(urban_rural_cat,
+                                    "pooled" = "Pooled",
                                     "rural" = "Rural", "urban" = "Urban"),
             country = forcats::fct_relevel(
                 forcats::fct_reorder(country, estimate, .desc = TRUE),
                 "Pooled, all countries"
             ),
             facet_group = dplyr::case_when( # create a faceting variable for the two forestplot panels -- one with pooled effects, one with urban and rural # nolint
-                urban_rural_cat == "pooled" ~ "Pooled urban & rural",
+                urban_rural_cat == "Pooled" ~ "Pooled urban & rural",
                 TRUE                        ~ "Stratified urban & rural"
             )
         )
@@ -50,7 +51,7 @@ build_forestplot_map_panel <- function(
             position = position_dodge(width = 0.5)
         ) +
         scale_color_manual(values = c(
-            "pooled" = "#366A9FFF", # blue-ish (mako)
+            "Pooled" = "#366A9FFF", # blue-ish (mako)
             "Rural"  = "#018571",   # teal
             "Urban"  = "#a6611a"    # brown
         )) +
