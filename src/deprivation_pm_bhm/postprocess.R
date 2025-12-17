@@ -186,7 +186,7 @@ compute_pw_pc1_draws <- function(pc1_draws_ur, df) {
 # .draw | country | Intercept | year
 extract_country_re_draws <- function(draws) {
     has_country_re  <- any(grepl(
-        "^r_country:grid_id\\[.*Intercept]|^r_country:grid_id\\[.*year]", 
+        "^r_country\\[.*Intercept]|^r_country\\[.*year]", 
         names(draws)
     ))
 
