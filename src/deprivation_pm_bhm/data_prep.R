@@ -2,26 +2,6 @@
 # hierarchical model
 # Date created: 15/12/2025
 
-# --- Helper: do PCA -----------------------------------------------------------
-# Computes PCA and returns both PCA object and augmented df
-compute_pca <- function(df, se_indicators) {
-    df_clean <- df[complete.cases(df[, se_indicators]), ]
-    
-    pca <- stats::prcomp(
-        formula = as.formula(
-            paste("~", paste(se_indicators, collapse = " + "))
-        ),
-        data   = df_clean,
-        scale  = TRUE,
-        center = TRUE,
-        retx   = TRUE
-    )
-    
-    df_aug <- bind_cols(df_clean, as.data.frame(pca$x))
-    
-    list(data = df_aug, pca = pca)
-}
-
 # --- Helper: prepare data for analysis / post-processing of model -------------
 # NOTE 16/12: the annual PM and SE data 'df' has a grid_id column from 
 # upstream data downloading/wrangling scripts. This is inconsistent with the 
@@ -46,9 +26,11 @@ prepare_analysis_data <- function(df, df_pca) {
 
 
 # --- Helper: prepare data for model (scale PC1 and centre year) ---------
-# TODO: probably update to take scale_pc1 and centre_year as params rather than the config (more clear)
-prepare_model_data <- function(data, model_formula, cfg_data = list()) {
+prepare_model_data <- function(
+    data, model_formula, scale_PC1 = TRUE, centre_year = TRUE
+    ) {
     data <- data %>%
+        filter(!is.na(urban_rural)) %>% 
         mutate(urban_rural_cat = as.factor(urban_rural)) %>% 
         group_by(lon, lat) %>% 
         mutate(grid_id = cur_group_id()) %>%   # Grid IDs
@@ -59,15 +41,36 @@ prepare_model_data <- function(data, model_formula, cfg_data = list()) {
     data_mod <- data %>% select(all_of(vars_needed))
     
     # Standardise PC1 / centre year if requested
-    if (isTRUE(cfg_data$scale_PC1)) {
+    if (scale_PC1) {
         data_mod <- data_mod %>%
-            mutate(PC1 = scale(PC1))
+            mutate(PC1 = as.numeric(scale(PC1)))
     }
-    if (isTRUE(cfg_data$centre_year)) {
+    if (centre_year) {
         data_mod <- data_mod %>% 
             mutate(year = year - mean(year, na.rm = TRUE))
     }
     
     data_mod
+}
+
+
+# --- Helper: do PCA -----------------------------------------------------------
+# Computes PCA and returns both PCA object and augmented df
+DEPRECEATED__compute_pca <- function(df, se_indicators) {
+    df_clean <- df[complete.cases(df[, se_indicators]), ]
+    
+    pca <- stats::prcomp(
+        formula = as.formula(
+            paste("~", paste(se_indicators, collapse = " + "))
+        ),
+        data   = df_clean,
+        scale  = TRUE,
+        center = TRUE,
+        retx   = TRUE
+    )
+    
+    df_aug <- bind_cols(df_clean, as.data.frame(pca$x))
+    
+    list(data = df_aug, pca = pca)
 }
 

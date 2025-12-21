@@ -42,6 +42,7 @@ model_dir <- cfg$project$model_save_dir
 
 # --- 0.3 Source post-processing helper functions ------------------------------
 source(file.path(root, "src/deprivation_pm_bhm/data_prep.R"))
+source(file.path(root, "src/deprivation_pm_bhm/pca.R"))
 source(file.path(root, "src/deprivation_pm_bhm/model_setup.R"))
 source(file.path(root, "src/deprivation_pm_bhm/model_summary.R"))
 source(file.path(root, "src/deprivation_pm_bhm/postprocess.R"))
