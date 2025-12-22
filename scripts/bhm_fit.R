@@ -1,4 +1,4 @@
-# Generic script to fir deprivation-PM2.5 Bayesian hierarchical models
+# Generic script to fit deprivation-PM2.5 Bayesian hierarchical models
 # - Load data & do PCA to construct deprivation index
 # - Estimate model as specified in config file and save to RDS file
 # Usage:
@@ -85,10 +85,10 @@ data_mod <- prepare_model_data(df_aug,
                                centre_year  = cfg$data$centre_year
                                )
 
-# --- Priors --------------------------------------------------------------
+# --- Priors -------------------------------------------------------------------
 prior   <- build_priors(beta_prior_sd, scale_prior_dist)
 
-# --- Fit model -----------------------------------------------------------
+# --- Fit model ----------------------------------------------------------------
 logging("Fitting model...")
 
 outfile <- build_modelfile(

@@ -19,7 +19,8 @@ cd "/home/users/cho00/fire-pm-dep"
 CONFIGS=(
   # "configs/bhm_fit_ppca_cfg.yaml"
   # "configs/bhm_fit_svd_cfg.yaml"
-  "configs/bhm_fit_ppca_10kiter_cfg.yaml"
+  # "configs/bhm_fit_ppca_10kiter_cfg.yaml"
+  "configs/bhm_fit_ppca_9kiter_cfg.yaml"
 )
 
 # Select config for this array task
