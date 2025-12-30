@@ -1,0 +1,20 @@
+project:
+  wd: "/home/users/cho00/fire-pm-dep/src/transported_pm_model"
+  emis_data_dir: "/work/scratch-pw4/cho00/data/spatial/transported_GFED_emissions_regional"           # emissions data dir (monthly)
+  se_data_filepath: "/work/scratch-pw4/cho00/data/spatial/descriptive_stats_GDP_pc/df_af_annual.csv"  # socioeconomic and PM data
+  model_filepath: "/work/scratch-pw4/cho00/data/spatial/transported_pm_model/inla_model.rds"
+  out_data_filepath: "/work/scratch-pw4/cho00/data/spatial/transported_pm_inla/df_af_annual_loc_tp.csv"  # path to save the resulting df with PM, SE indicators, + local & transported PM
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/inla/share/proj"
+
+data:
+  years: { start: 2000, end: 2017 }
+  # adj_path: "/work/scratch-pw4/cho00/data/spatial/transported_pm_model/afr.adj" # path to adjacency matrix
+  se_indicators:
+    - "edu_mean_years"
+    - "imp_san_access_pct"
+    - "log_GDP_pc"
+    - "stunting_pct_u5"
+    - "child_dep_pct"
+

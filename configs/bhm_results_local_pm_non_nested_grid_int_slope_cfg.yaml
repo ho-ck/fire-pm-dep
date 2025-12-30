@@ -30,6 +30,7 @@ data:
     - "child_dep_pct"
   centre_year: true
   scale_PC1: true
+  scale_y: false
 
 model:
   name: "non_nested_grid_int_slope_model"

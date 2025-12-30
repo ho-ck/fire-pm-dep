@@ -45,7 +45,8 @@ model_formula   <- as.formula(paste(
 ))
 
 logging("Running model:", cfg$model$name, "(", cfg$model$description, ").",
-        "\nOutcome:", cfg$model$outcome, "\nPCA method:", cfg$pca$method)
+        "\nOutcome:", cfg$model$outcome, "(scale_y:", cfg$data$scale_y, ").",
+        "\nPCA method:", cfg$pca$method)
 
 # --- MCMC settings ------------------------------------------------------------
 n_chains    <- cfg$mcmc$chains
@@ -59,7 +60,8 @@ scale_prior_dist <- cfg$priors$scale_dist
 
 # --- Load data ----------------------------------------------------------------
 logging("Loading data...")
-df <- readr::read_csv(data_filepath)
+df <- readr::read_csv(data_filepath) %>% 
+    filter(year <= 2017)    # 2000-2017 time period of SE indicators
 
 # --- Do PCA -------------------------------------------------------------------
 logging("Computing PCA...")
@@ -69,10 +71,11 @@ pca_res <- compute_pca(
     se_indicators   = cfg$data$se_indicators,
     n_pcs           = cfg$pca$n_pcs,
     scale           = cfg$pca$scale,
-    centre          = cfg$pca$centre
+    centre          = cfg$pca$centre,
+    seed            = cfg$pca$seed
 )
 
-# Augmented df with PCs (523,116 rows for svd / 807012 rows for ppca)
+# Augmented df with PCs (523,116 rows for svd / 726318 rows for ppca)
 df_aug <- pca_res$data
 
 # Save PCA loadings & variance explained
@@ -80,9 +83,11 @@ save_pca_res( pca_res$pca, cfg$pca$method, cfg$project$model_save_dir )
 
 # --- Prepare data for model ---------------------------------------------------
 data_mod <- prepare_model_data(df_aug, 
-                               model_formula, 
-                               scale_PC1    = cfg$data$scale_PC1,
-                               centre_year  = cfg$data$centre_year
+                               outcome        = cfg$model$outcome,
+                               model_formula  = model_formula, 
+                               scale_PC1      = cfg$data$scale_PC1,
+                               centre_year    = cfg$data$centre_year,
+                               scale_y        = cfg$data$scale_y
                                )
 
 # --- Priors -------------------------------------------------------------------
@@ -94,8 +99,9 @@ logging("Fitting model...")
 outfile <- build_modelfile(
     out_path    = model_save_dir,
     model_name  = cfg$model$name,
-    pca_method  = cfg$pca$method,
     outcome     = cfg$model$outcome,
+    scale_y     = cfg$data$scale_y,
+    pca_method  = cfg$pca$method,
     mcmc_cfg    = cfg$mcmc,
     priors_cfg  = cfg$priors
 )

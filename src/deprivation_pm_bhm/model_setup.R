@@ -30,13 +30,14 @@ build_priors <- function(beta_sd, scale_type) {
 
 
 # --- Helper: file name builder ------------------------------------------------
-build_modelfile <- function(out_path, outcome, model_name, pca_method,
+build_modelfile <- function(out_path, outcome, scale_y, model_name, pca_method,
                             mcmc_cfg, priors_cfg) {
     file.path(
         out_path,
         paste0(
             model_name, "_",
             outcome, "_",
+            "scaley", scale_y, "_",
             pca_method, "PcaMethod_",
             mcmc_cfg$chains, "chains_",
             mcmc_cfg$iter, "iter_",

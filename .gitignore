@@ -6,3 +6,5 @@
 *.pdf
 sandboxes/*
 *.log
+configs/old/*
+outputs/old/*

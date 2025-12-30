@@ -38,7 +38,7 @@ Sys.setenv(PROJ_DATA = cfg$environment$proj_data)
 set_cmdstan_path(cfg$environment$cmdstan_path)
 
 data_filepath  <- cfg$project$data_filepath
-model_dir <- cfg$project$model_save_dir
+model_save_dir <- cfg$project$model_save_dir
 
 # --- 0.3 Source post-processing helper functions ------------------------------
 source(file.path(root, "src/deprivation_pm_bhm/data_prep.R"))
@@ -56,10 +56,9 @@ model_formula   <- as.formula(paste(
     model_cfg$outcome, "~", model_cfg$formula_rhs
 ))
 
-logging(
-    "Post-processing model: ", model_name, " (", model_cfg$description, ").",
-    "Outcome: ", model_cfg$outcome
-)
+logging("Post-processing model:", cfg$model$name, "(", cfg$model$description, ").",
+        "\nOutcome:", cfg$model$outcome, "(scale_y:", cfg$data$scale_y, ").",
+        "\nPCA method:", cfg$pca$method)
 
 # ---- 0.5 Output directory ----------------------------------------------------
 out_dir <- results_dirname_builder(
@@ -80,24 +79,39 @@ logging("Loading data...")
 nat_bounds  <- sf::read_sf( cfg$project$nat_bounds_filepath ) %>%
     filter(CONTINENT == "Africa")
 
-df  <- readr::read_csv( data_filepath )
+df  <- readr::read_csv( data_filepath ) %>% 
+    filter(year <= 2017)    # 2000-2017 time period of SE indicators
 
-# Do PCA (only for rows with complete SE data)
-df_pca  <- compute_pca(df, cfg$data$se_indicators)$data
+# Do PCA, keep augmented dataset with PCS
+df_pca  <- compute_pca( 
+    df,
+    method          = cfg$pca$method,
+    se_indicators   = cfg$data$se_indicators,
+    n_pcs           = cfg$pca$n_pcs,
+    scale           = cfg$pca$scale,
+    centre          = cfg$pca$centre,
+    seed            = cfg$pca$seed
+)$data
 
 # Join PCs back onto df (helper funct)
-df  <- prepare_analysis_data(df, df_pca)
+df  <- prepare_analysis_data(df, df_pca, 
+                             outcome = cfg$model$outcome, 
+                             scale_y = cfg$data$scale_y,
+                             scale_PC1 = cfg$data$scale_PC1)
 
 # --- 1.2 Load model -----------------------------------------------------------
 logging("Loading model...")
 
 model_file <- build_modelfile(
-    out_path    = model_dir,
-    outcome     = model_cfg$outcome,
-    model_name  = model_name,
+    out_path    = model_save_dir,
+    model_name  = cfg$model$name,
+    outcome     = cfg$model$outcome,
+    scale_y     = cfg$data$scale_y,
+    pca_method  = cfg$pca$method,
     mcmc_cfg    = cfg$mcmc,
     priors_cfg  = cfg$priors
 )
+
 model   <- readRDS(model_file)
 
 # Summary diagnostics, priors, Stan code

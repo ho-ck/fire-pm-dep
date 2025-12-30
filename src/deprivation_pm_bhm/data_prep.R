@@ -8,7 +8,8 @@
 # grid_id's used in the deprivation-PM BHM, which was fitted to rows with non-NA
 # PC1 (i.e., complete socioeconomic data). Thus, re-create the grid_id's of 'df'
 # to match the model data, i.e., grid_id's for non-NA PC1.
-prepare_analysis_data <- function(df, df_pca) {
+prepare_analysis_data <- function(df, df_pca, 
+    outcome = NA_character_, scale_y = FALSE, scale_PC1 = TRUE) {
     df_pca  <- df_pca %>%   # contains only non-NA PC1 (523,116 rows)
         group_by(lon, lat) %>% 
         mutate(grid_id = cur_group_id()) %>%
@@ -21,13 +22,29 @@ prepare_analysis_data <- function(df, df_pca) {
             df_pca %>% select(lon, lat, year, grid_id, paste0("PC", 1:5)),
             by = c("year", "lon", "lat")
         )
-    df  # 828600 rows (523,116 with non-NA PC1)
+    
+    # Scale outcome if requested
+    if (scale_y) { # Use mean/sd of the model input data (df_pca, w/ non-NA PC1)
+        df <- df %>%
+            mutate("{outcome}" := 
+                (!!sym(outcome) - mean(df_pca[[outcome]], na.rm = TRUE)) /
+                    sd(df_pca[[outcome]], na.rm = TRUE)
+            )
+    }
+    # Scale PC1 if requested (so that maps etc. will have SDs as units)
+    if (scale_PC1) {
+        df <- df %>%
+            mutate(PC1 = as.numeric(scale(PC1)))
+    }
+
+    df  # (523,116 rows with non-NA PC1)
 }
 
 
-# --- Helper: prepare data for model (scale PC1 and centre year) ---------
+# --- Helper: prepare data for model (scale PC1 and centre year) ---------------
 prepare_model_data <- function(
-    data, model_formula, scale_PC1 = TRUE, centre_year = TRUE
+    data, outcome, model_formula, scale_PC1 = TRUE, centre_year = TRUE, 
+    scale_y = FALSE
     ) {
     data <- data %>%
         filter(!is.na(urban_rural)) %>% 
@@ -40,7 +57,7 @@ prepare_model_data <- function(
     vars_needed <- setdiff(all.vars(model_formula), "Intercept")
     data_mod <- data %>% select(all_of(vars_needed))
     
-    # Standardise PC1 / centre year if requested
+    # Standardise PC1 / centre year / standardise outcome if requested
     if (scale_PC1) {
         data_mod <- data_mod %>%
             mutate(PC1 = as.numeric(scale(PC1)))
@@ -48,6 +65,10 @@ prepare_model_data <- function(
     if (centre_year) {
         data_mod <- data_mod %>% 
             mutate(year = year - mean(year, na.rm = TRUE))
+    }
+    if (scale_y) {
+        data_mod <- data_mod %>%
+            mutate("{outcome}" := as.numeric(scale(!!sym(outcome))))
     }
     
     data_mod

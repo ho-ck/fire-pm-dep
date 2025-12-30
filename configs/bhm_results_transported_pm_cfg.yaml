@@ -29,6 +29,7 @@ data:
     - "child_dep_pct"
   centre_year: true
   scale_PC1: true
+  scale_y: false
 
 model:
   name: "original_model"

@@ -7,7 +7,7 @@
 #SBATCH --time=04:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=128G
-# Usage: sbatch scripts/run_bhm_results.slurm
+# Usage: sbatch scripts/run_bhm_results.sh
 
 # Load environment
 source ~/miniconda3/bin/activate
