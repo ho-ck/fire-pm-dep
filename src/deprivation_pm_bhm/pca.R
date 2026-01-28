@@ -7,7 +7,8 @@
 compute_pca <- function(df, se_indicators, n_pcs,
                         method = c("svd", "ppca"),
                         scale = TRUE, centre = TRUE,
-                        seed = 42) {
+                        seed = 42, 
+                        positive_vars = NULL, negative_vars = NULL) {
 
     # Ensure 'method' is one of "svd", "ppca"
     method <- match.arg(method)
@@ -38,6 +39,23 @@ compute_pca <- function(df, se_indicators, n_pcs,
         pcaMethods::svdPca(X, nPcs = n_pcs)
     } else {
         pcaMethods::ppca(X, nPcs = n_pcs, seed = seed)
+    }
+
+    # Flip PC1 as necessary so that it represents increasing deprivation
+    # (ppca sometimes returns negative of deprivation)
+    if (!is.null(positive_vars) && !is.null(negative_vars)) {
+        
+        loadings_pc1 <- pca@loadings[, 1]
+
+        # Expect stunting & child dep to load positively, GDP, edu, san negative
+        if (mean(loadings_pc1[positive_vars]) <
+            mean(loadings_pc1[negative_vars])) {
+
+            logging("Flipping PC1 so higher = more deprivation")
+
+            pca@scores[, 1]   <- -pca@scores[, 1]
+            pca@loadings[, 1] <- -pca@loadings[, 1]
+        }
     }
 
     # Bind PCA scores back onto data

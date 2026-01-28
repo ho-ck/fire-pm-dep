@@ -38,6 +38,10 @@ pca:
   scale: true
   centre: true
   seed: 42
+  pc1_positive_loadings: ["stunting_pct_u5", "child_dep_pct"]
+  pc1_negative_loadings: ["edu_mean_years",
+                          "imp_san_access_pct",
+                          "log_GDP_pc"]
 
 model:
   name: "original_model"

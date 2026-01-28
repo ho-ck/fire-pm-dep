@@ -12,7 +12,7 @@ mcmc:
   chains: 4
   iter: 15000
   warmup: 5000
-  threads: 12
+  threads: 24
   adapt_delta: 0.95
 
 priors:
@@ -33,8 +33,9 @@ data:
 pca:
   method: "svd"  # classical PCA
   n_pcs: 5
-  scale: "uv"
+  scale: true
   centre: true
+  seed: 42
 
 model:
   name: "original_model"

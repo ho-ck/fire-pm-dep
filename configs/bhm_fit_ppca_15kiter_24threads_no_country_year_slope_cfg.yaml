@@ -1,9 +1,8 @@
-# Config file for original model: no grid-level REs
-# bc_attr_fire_PM25_emis_100_2000km as output (bias-corrected estimate of transported fire_PM25).
-# ^^scaled dependent variable -- units expressed in SDs relative to continent mean.
+# Config file for original model: no grid-level REs, fire_PM25 as output.
+# Except: no country-level random slope on year.
 # Using probabilistic PCA deprivation index (missing data imputation for san. acc.).
 project:
-  data_filepath: "/work/scratch-pw4/cho00/data/spatial/transported_pm_inla/df_af_annual_loc_tp.csv" # estimated by the INLA model
+  data_filepath: "/work/scratch-pw4/cho00/data/spatial/descriptive_stats_GDP_pc/df_af_annual.csv"
   model_save_dir: "/work/scratch-pw4/cho00/data/spatial/deprivation_pm_bhm"
   nat_bounds_filepath: "/work/scratch-pw4/cho00/data/spatial/nat_boundaries/WB_countries_Admin0_10m"
 
@@ -31,10 +30,10 @@ data:
     - "child_dep_pct"
   centre_year: true
   scale_PC1: true
-  scale_y: true
+  scale_y: false
 
 pca:
-  method: "ppca"  # probabilistic PCAss
+  method: "ppca"  # probabilistic PCA
   n_pcs: 5
   scale: true
   centre: true
@@ -45,9 +44,9 @@ pca:
                           "log_GDP_pc"]
 
 model:
-  name: "original_model"
-  description: "No grid-level REs"
-  outcome: "bc_attr_fire_PM25_emis_100_2000km"
+  name: "no_country_year_slope"
+  description: "No country-level slope on year (but includes all other country-level effects)"
+  outcome: "fire_PM25"
   formula_rhs: >
       0 + Intercept + PC1 * urban_rural_cat + year +
-        (1 + PC1 * urban_rural_cat + year | country)
+        (1 + PC1 * urban_rural_cat | country)

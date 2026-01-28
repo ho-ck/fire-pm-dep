@@ -8,7 +8,9 @@
 build_forestplot_map_panel <- function(
     slopes_ur,
     slopes_pw_avg,
-    sf_slopes_ur
+    sf_slopes_ur,
+    axis_title_x_forestplot = "Change in fire PM₂.₅ (μg m⁻³) per SD increase in deprivation", #nolint
+    fill_name_maps          = "Change in fire PM₂.₅ (μg m⁻³) per\nSD increase in deprivation" # nolint
     ) {
 
     # Forest plot
@@ -61,7 +63,7 @@ build_forestplot_map_panel <- function(
             color      = "gray50"
         ) +
         labs(
-            x     = "Change in fire PM₂.₅ (μg m⁻³) per SD increase in deprivation", # nolint
+            x     = axis_title_x_forestplot,
             y     = NULL,
             color = NULL,
             title = NULL
@@ -80,7 +82,7 @@ build_forestplot_map_panel <- function(
             axis.text            = element_text(color = "black", size = 12),
             strip.text           = element_text(color = "black", size = 12),
             plot.title           = element_blank(),
-            plot.margin          = margin(0, 0, 0, 30)  # left margin to stop Central African Republic getting clipped  # nolint
+            plot.margin          = margin(0, 0, 0, 0)#30)  # left margin to stop Central African Republic getting clipped  # nolint
         )
 
     # Map figure (uses `map_country_effects()` helper from plotting_functions.R)
@@ -91,7 +93,7 @@ build_forestplot_map_panel <- function(
             )),
         variable_name    = "PC1",
         urban_rural_var  = "urban_rural_cat",
-        fill_name        = "Change in fire PM₂.₅ (μg m⁻³) per\nSD increase in deprivation", # nolint
+        fill_name        = fill_name_maps,
         pattern_name     = NULL,
         facet_ncol       = 1
     ) +
@@ -108,7 +110,8 @@ build_forestplot_map_panel <- function(
         )
 
     forestplot_maps_patchwork <- forestplot_fig + map_fig +
-        plot_layout(widths = c(1.8, 1)) +
+        # plot_layout(widths = c(1.8, 1)) +
+        plot_layout(widths = c(1.72, 1)) +
         plot_layout(guides = "collect") &
         theme(legend.position  = "bottom",
               legend.spacing.x = unit(1, "cm"))
@@ -296,6 +299,7 @@ plot_map <- function(
     frame_color = "black",
     legend_position = "right",
     legend_title_text_size = 14,
+    legend_title_text_face = "bold",
     legend_text_size = 10,
     title_text_size = 14,
     subtitle_text_size = 11,
@@ -331,7 +335,7 @@ plot_map <- function(
         theme_minimal() +
         theme(
             legend.position = legend_position,
-            legend.title = element_text(size = legend_title_text_size, face = "bold"),
+            legend.title = element_text(size = legend_title_text_size, face = legend_title_text_face),
             legend.text = element_text(size = legend_text_size),
             legend.key.height = unit(colorbar_height, "cm"),
             plot.title = element_text(size = title_text_size, face = "bold"),

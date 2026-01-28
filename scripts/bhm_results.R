@@ -4,7 +4,7 @@
 # - Computes population-weighted country-average effects
 # - Joins to shapefiles and produces plots/maps (saves to output dir)
 # Usage:
-#   Rscript bhm_results.R configs/bhm_results_cfg.yaml
+#   Rscript bhm_results.R configs/bhm_fit_ppca_15kiter_24threads_cfg.yaml
 # Date created: 15/12/2025
 
 # ==============================================================================
@@ -56,9 +56,11 @@ model_formula   <- as.formula(paste(
     model_cfg$outcome, "~", model_cfg$formula_rhs
 ))
 
-logging("Post-processing model:", cfg$model$name, "(", cfg$model$description, ").",
+logging("Post-processing model:", cfg$model$name, 
+        "(", cfg$model$description, ").",
         "\nOutcome:", cfg$model$outcome, "(scale_y:", cfg$data$scale_y, ").",
-        "\nPCA method:", cfg$pca$method)
+        "\nPCA method:", cfg$pca$method, "\nFormula:")
+print(model_formula)
 
 # ---- 0.5 Output directory ----------------------------------------------------
 out_dir <- results_dirname_builder(
@@ -82,7 +84,7 @@ nat_bounds  <- sf::read_sf( cfg$project$nat_bounds_filepath ) %>%
 df  <- readr::read_csv( data_filepath ) %>% 
     filter(year <= 2017)    # 2000-2017 time period of SE indicators
 
-# Do PCA, keep augmented dataset with PCS
+# Do PCA, keep augmented dataset with PCs
 df_pca  <- compute_pca( 
     df,
     method          = cfg$pca$method,
@@ -90,7 +92,9 @@ df_pca  <- compute_pca(
     n_pcs           = cfg$pca$n_pcs,
     scale           = cfg$pca$scale,
     centre          = cfg$pca$centre,
-    seed            = cfg$pca$seed
+    seed            = cfg$pca$seed,
+    positive_vars   = cfg$pca$pc1_positive_loadings,
+    negative_vars   = cfg$pca$pc1_negative_loadings
 )$data
 
 # Join PCs back onto df (helper funct)
@@ -203,14 +207,13 @@ if (!is.null(country_re)) {
 
     for (i in seq_along(country_re_plots)) {
         ggplot2::ggsave(
-            plot        = country_re_plots[[i]],
-            filename    = file.path(out_dir,
-                                    paste0("map_country_random_",
-                                            names(country_re_plots)[[i]],
-                                            ".png")),
-            width       = 8,
-            height      = 6,
-            bg          = "white"    
+            plot      = country_re_plots[[i]],
+            filename  = file.path(out_dir, paste0("map_country_random_",
+                                                   names(country_re_plots)[[i]],
+                                                   ".png")),
+            width     = 8,
+            height    = 6,
+            bg        = "white"    
         )
     }
 }
@@ -235,14 +238,13 @@ if (!is.null(grid_re)) {
 
     for (i in seq_along(grid_re_plots)) {
         ggplot2::ggsave(
-            plot        = grid_re_plots[[i]],
-            filename    = file.path(out_dir,
-                                    paste0("map_grid_random_",
-                                            names(grid_re_plots)[[i]],
-                                            ".png")),
-            width       = 8,
-            height      = 6,
-            bg          = "white"    
+            plot      = grid_re_plots[[i]],
+            filename  = file.path(out_dir, paste0("map_grid_random_",
+                                                  names(grid_re_plots)[[i]],
+                                                  ".png")),
+            width     = 8,
+            height    = 6,
+            bg        = "white"    
         )
     }
 }

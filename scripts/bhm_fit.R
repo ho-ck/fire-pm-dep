@@ -2,7 +2,7 @@
 # - Load data & do PCA to construct deprivation index
 # - Estimate model as specified in config file and save to RDS file
 # Usage:
-#   Rscript fit_bhm.R configs/fit_bhm_cfg.yaml <model_index>
+#   Rscript fit_bhm.R configs/bhm_fit_ppca_15kiter_24threads_cfg.yaml
 # Date created: 19/12/2025
 
 # --- Setup & libraries --------------------------------------------------------
@@ -46,7 +46,8 @@ model_formula   <- as.formula(paste(
 
 logging("Running model:", cfg$model$name, "(", cfg$model$description, ").",
         "\nOutcome:", cfg$model$outcome, "(scale_y:", cfg$data$scale_y, ").",
-        "\nPCA method:", cfg$pca$method)
+        "\nPCA method:", cfg$pca$method, "\nFormula:")
+print(model_formula)
 
 # --- MCMC settings ------------------------------------------------------------
 n_chains    <- cfg$mcmc$chains
@@ -72,7 +73,9 @@ pca_res <- compute_pca(
     n_pcs           = cfg$pca$n_pcs,
     scale           = cfg$pca$scale,
     centre          = cfg$pca$centre,
-    seed            = cfg$pca$seed
+    seed            = cfg$pca$seed,
+    positive_vars   = cfg$pca$pc1_positive_loadings,
+    negative_vars   = cfg$pca$pc1_negative_loadings
 )
 
 # Augmented df with PCs (523,116 rows for svd / 726318 rows for ppca)

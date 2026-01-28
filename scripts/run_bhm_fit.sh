@@ -3,10 +3,10 @@
 #SBATCH --account=no-project
 #SBATCH --partition=standard
 #SBATCH --qos=high
-#SBATCH --array=1-6
+#SBATCH --array=8 # 1-8
 #SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=96  # 48 if 12 threads_per_chain
-#SBATCH --mem=512G
+#SBATCH --mem=256G #512G
 # Usage: sbatch scripts/run_bhm_fit.sh
 
 # Load environment
@@ -17,13 +17,14 @@ conda activate ppca
 cd "/home/users/cho00/fire-pm-dep"
 
 CONFIGS=(
-  # "configs/bhm_fit_svd_cfg.yaml"
-  # "configs/bhm_fit_ppca_15kiter_24threads_cfg.yaml"
+  "configs/bhm_fit_svd_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_cfg.yaml"
   "configs/bhm_fit_ppca_15kiter_24threads_scaley_cfg.yaml"
-  # "configs/bhm_fit_ppca_15kiter_24threads_local_cfg.yaml"
-  # "configs/bhm_fit_ppca_15kiter_24threads_local_scaley_cfg.yaml"
-  # "configs/bhm_fit_ppca_15kiter_24threads_transported_cfg.yaml"
-  # "configs/bhm_fit_ppca_15kiter_24threads_transported_scaley_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_local_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_local_scaley_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_transported_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_transported_scaley_cfg.yaml"
+  "configs/bhm_fit_ppca_15kiter_24threads_no_country_year_slope_cfg.yaml"
 )
 
 # Select config for this array task

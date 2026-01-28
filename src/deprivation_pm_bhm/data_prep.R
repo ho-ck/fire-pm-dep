@@ -11,10 +11,17 @@
 prepare_analysis_data <- function(df, df_pca, 
     outcome = NA_character_, scale_y = FALSE, scale_PC1 = TRUE) {
     df_pca  <- df_pca %>%   # contains only non-NA PC1 (523,116 rows)
+        filter(!is.na(urban_rural)) %>% 
         group_by(lon, lat) %>% 
         mutate(grid_id = cur_group_id()) %>%
         ungroup()
 
+    # Scale PC1 if requested (so that maps etc. will have SDs as units)
+    if (scale_PC1) {
+        df_pca <- df_pca %>%
+            mutate(PC1 = as.numeric(scale(PC1)))
+    }
+    
     # Join PCs back onto df
     df  <- df %>% 
         select(-grid_id) %>%    # remove pre-existing grid IDs, replace with the IDs consistent with the model # nolint
@@ -31,12 +38,7 @@ prepare_analysis_data <- function(df, df_pca,
                     sd(df_pca[[outcome]], na.rm = TRUE)
             )
     }
-    # Scale PC1 if requested (so that maps etc. will have SDs as units)
-    if (scale_PC1) {
-        df <- df %>%
-            mutate(PC1 = as.numeric(scale(PC1)))
-    }
-
+    
     df  # (523,116 rows with non-NA PC1)
 }
 

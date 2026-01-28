@@ -1,0 +1,79 @@
+ Family: gaussian 
+  Links: mu = identity; sigma = identity 
+Formula: fire_PM25 ~ 0 + Intercept + PC1 * urban_rural_cat + year + (1 + PC1 * urban_rural_cat + year | country) 
+   Data: data_mod (Number of observations: 725364) 
+  Draws: 4 chains, each with iter = 15000; warmup = 5000; thin = 1;
+         total post-warmup draws = 40000
+
+Multilevel Hyperparameters:
+~country (Number of levels: 52) 
+                                                   Estimate Est.Error l-95% CI
+sd(Intercept)                                          0.82      0.08     0.68
+sd(PC1)                                                0.38      0.04     0.32
+sd(urban_rural_caturban)                               0.39      0.05     0.30
+sd(year)                                               0.02      0.00     0.02
+sd(PC1:urban_rural_caturban)                           0.27      0.04     0.21
+cor(Intercept,PC1)                                     0.07      0.13    -0.19
+cor(Intercept,urban_rural_caturban)                   -0.23      0.13    -0.47
+cor(PC1,urban_rural_caturban)                          0.49      0.11     0.25
+cor(Intercept,year)                                   -0.29      0.12    -0.51
+cor(PC1,year)                                          0.34      0.12     0.09
+cor(urban_rural_caturban,year)                         0.30      0.14     0.01
+cor(Intercept,PC1:urban_rural_caturban)               -0.03      0.15    -0.31
+cor(PC1,PC1:urban_rural_caturban)                     -0.57      0.12    -0.76
+cor(urban_rural_caturban,PC1:urban_rural_caturban)     0.15      0.19    -0.23
+cor(year,PC1:urban_rural_caturban)                    -0.11      0.15    -0.39
+                                                   u-95% CI Rhat Bulk_ESS
+sd(Intercept)                                          1.01 1.00     1110
+sd(PC1)                                                0.46 1.00     1699
+sd(urban_rural_caturban)                               0.50 1.00     2369
+sd(year)                                               0.03 1.00     2115
+sd(PC1:urban_rural_caturban)                           0.34 1.00     2488
+cor(Intercept,PC1)                                     0.31 1.00      876
+cor(Intercept,urban_rural_caturban)                    0.03 1.00     1412
+cor(PC1,urban_rural_caturban)                          0.69 1.00     1963
+cor(Intercept,year)                                   -0.03 1.00     1110
+cor(PC1,year)                                          0.56 1.00     1779
+cor(urban_rural_caturban,year)                         0.55 1.00     1527
+cor(Intercept,PC1:urban_rural_caturban)                0.27 1.00     1610
+cor(PC1,PC1:urban_rural_caturban)                     -0.30 1.00     2430
+cor(urban_rural_caturban,PC1:urban_rural_caturban)     0.50 1.00     2760
+cor(year,PC1:urban_rural_caturban)                     0.18 1.00     1982
+                                                   Tail_ESS
+sd(Intercept)                                          2168
+sd(PC1)                                                3616
+sd(urban_rural_caturban)                               5315
+sd(year)                                               4643
+sd(PC1:urban_rural_caturban)                           5954
+cor(Intercept,PC1)                                     1879
+cor(Intercept,urban_rural_caturban)                    3150
+cor(PC1,urban_rural_caturban)                          4300
+cor(Intercept,year)                                    3308
+cor(PC1,year)                                          3760
+cor(urban_rural_caturban,year)                         3377
+cor(Intercept,PC1:urban_rural_caturban)                3005
+cor(PC1,PC1:urban_rural_caturban)                      4969
+cor(urban_rural_caturban,PC1:urban_rural_caturban)     6402
+cor(year,PC1:urban_rural_caturban)                     4481
+
+Regression Coefficients:
+                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+Intercept                    0.01      0.11    -0.20     0.23 1.01      391
+PC1                          0.07      0.05    -0.03     0.17 1.01      548
+urban_rural_caturban        -0.09      0.06    -0.21     0.02 1.00      763
+year                        -0.01      0.00    -0.01    -0.00 1.01      732
+PC1:urban_rural_caturban    -0.05      0.04    -0.13     0.03 1.00      986
+                         Tail_ESS
+Intercept                     988
+PC1                          1146
+urban_rural_caturban         1838
+year                         1499
+PC1:urban_rural_caturban     1995
+
+Further Distributional Parameters:
+      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sigma     0.34      0.00     0.34     0.34 1.00    65402    29111
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
