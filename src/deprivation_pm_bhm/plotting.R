@@ -9,8 +9,8 @@ build_forestplot_map_panel <- function(
     slopes_ur,
     slopes_pw_avg,
     sf_slopes_ur,
-    axis_title_x_forestplot = "Change in fire PM₂.₅ (μg m⁻³) per SD increase in deprivation", #nolint
-    fill_name_maps          = "Change in fire PM₂.₅ (μg m⁻³) per\nSD increase in deprivation" # nolint
+    axis_title_x_forestplot = "Change in fire PM₂.₅ (μg/m³) per SD increase in deprivation", #nolint
+    fill_name_maps          = "Change in fire PM₂.₅ (μg/m³) per\nSD increase in deprivation" # nolint
     ) {
 
     # Forest plot
@@ -354,7 +354,7 @@ plot_map <- function(
     }
 
     if (!is.null(facet_var)) {
-        p <- p + facet_wrap(reformulate(facet_var), ncol = facet_ncol, drop = FALSE)
+        p <- p + facet_wrap(reformulate(facet_var), ncol = facet_ncol, drop = FALSE, axes = "all_y")
     }
 
     if (grid_off) {

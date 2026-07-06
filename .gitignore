@@ -8,3 +8,5 @@ sandboxes/*
 *.log
 configs/old/*
 outputs/old/*
+
+src/setup_scripts/__pycache__/utils.cpython-39.pyc

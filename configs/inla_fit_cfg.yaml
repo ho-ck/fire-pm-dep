@@ -1,0 +1,11 @@
+project:
+  emis_data_dir: "/work/scratch-pw4/cho00/data/spatial/fire_pm_dep_paper_data/transported_GFED_emissions_regional"  # emissions data dir (monthly)
+  model_filepath: "/work/scratch-pw4/cho00/data/spatial/transported_pm_inla/inla_model.rds"
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/inla/share/proj"
+
+data:
+  years: { start: 2000, end: 2017 }
+  adj_path: "/work/scratch-pw4/cho00/data/spatial/transported_pm_inla/afr.adj"  # path to adjacency matrix
+

@@ -43,22 +43,26 @@ load_data_and_wrangle <- function(filepath, years_sel = 2000:2017) {
     data <- data %>%
         mutate(
             emis_0_20km   = gfed_PM25_mass_emis,            # local grid cell emissions  # nolint
-            emis_20_100km = emis_14_50km + emis_50_100km    # combine 20-50 and 50-100km bands (renaming the '14km' to '20km', as 20km is approx the hypotenuse of the 0.25° grid cell. note that I had originally named them '14km' in the GFED emissions data processing script, corresponding to half the width of a 0.25° grid cell) # nolint
+            # emis_20_100km = emis_14_50km + emis_50_100km    # combine 20-50 and 50-100km bands (renaming the '14km' to '20km', as 20km is approx the hypotenuse of the 0.25° grid cell. note that I had originally named them '14km' in the GFED emissions data processing script, corresponding to half the width of a 0.25° grid cell) # nolint
+            emis_20_100km = emis_20_50km + emis_50_100km    # combine 20-50 and 50-100km bands  #nolint
         ) %>%
         rename(
-            "__emis_14_50km"  = emis_14_50km,               # bit hacky: rename unused emissions cols so they don't interfere w/ regex matching later  # nolint
+            # "__emis_14_50km"  = emis_14_50km,               # bit hacky: rename unused emissions cols so they don't interfere w/ regex matching later  # nolint
+            "__emis_20_50km"  = emis_20_50km,               # bit hacky: rename unused emissions cols so they don't interfere w/ regex matching later  # nolint
             "__emis_50_100km" = emis_50_100km
         )
 
     # Same wrangling for the source region emissions cols
     for (r in unique(data$region)) {
         data[[paste0("emis_20_100km_", r)]] <-
-            data[[paste0("emis_14_50km_", r)]] +
+            # data[[paste0("emis_14_50km_", r)]] +
+            data[[paste0("emis_20_50km_", r)]] +
             data[[paste0("emis_50_100km_", r)]]
 
         data <- data %>%
             rename(
-                !!paste0("__emis_14_50km_", r)  := paste0("emis_14_50km_", r),
+                # !!paste0("__emis_14_50km_", r)  := paste0("emis_14_50km_", r),
+                !!paste0("__emis_20_50km_", r)  := paste0("emis_20_50km_", r),
                 !!paste0("__emis_50_100km_", r) := paste0("emis_50_100km_", r)
             )
     }

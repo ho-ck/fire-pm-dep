@@ -15,6 +15,13 @@ suppressPackageStartupMessages({
     library(yaml)
 })
 
+# --- Source helper functions --------------------------------------------------
+root    <- rprojroot::find_root(rprojroot::has_file(".gitignore"))
+source(file.path(root, "src/transported_pm_inla/data_prep.R"))
+source(file.path(root, "src/transported_pm_inla/adj_matrix.R"))
+source(file.path(root, "src/transported_pm_inla/model_summary.R"))
+source(file.path(root, "src/transported_pm_inla/attributable_pm.R"))
+
 # --- Parse yaml arg -----------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 1) {
@@ -23,8 +30,7 @@ if (length(args) != 1) {
 }
 config_file  <- args[1]
 
-# --- Load config and set environment ------------------------------------------
-root    <- rprojroot::find_root(rprojroot::has_file(".gitignore"))
+# --- Load config, set environment, set paths ----------------------------------
 cfg     <- yaml::read_yaml(file.path(root, config_file))
 
 # Environment & paths
@@ -37,12 +43,6 @@ out_data_filepath   <- cfg$project$out_data_filepath
 if (!dir.exists(dirname(out_data_filepath))) {
     dir.create(dirname(out_data_filepath), recursive = TRUE)
 }
-
-# --- Source helper functions --------------------------------------------------
-source(file.path(root, "src/transported_pm_inla/data_prep.R"))
-source(file.path(root, "src/transported_pm_inla/adj_matrix.R"))
-source(file.path(root, "src/transported_pm_inla/model_summary.R"))
-source(file.path(root, "src/transported_pm_inla/attributable_pm.R"))
 
 # --- Load PM & GFED emissions (monthly) data and wrangle ----------------------
 yrs  <- cfg$data$years

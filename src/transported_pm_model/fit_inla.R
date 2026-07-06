@@ -72,8 +72,8 @@ data_scaled <- data %>%
 
 # --- Priors -------------------------------------------------------------
 hyper_bym2 <- list(
-    prec = list(prior = "pc.prec", param = c(5/0.31, 0.01)),
-    phi  = list(prior = "pc", param = c(0.5, 2/3))
+    prec = list(prior = "pc.prec", param = c(5 / 0.31, 0.01)),
+    phi  = list(prior = "pc", param = c(0.5, 2 / 3))
 )
 
 hyper_sigma <- list(
