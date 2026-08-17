@@ -15,5 +15,6 @@ cookies.qU72SRv26f
 netrc.eBWloOy9Hq
 
 *.ipynb_checkpoints
+*.ipynb_checkpoints/*
 
 !paper_results/figures/*.png
