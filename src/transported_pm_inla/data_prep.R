@@ -17,13 +17,58 @@ load_data_and_wrangle <- function(filepath, years_sel = 2000:2017) {
     }
 
     # --- Read data ----------------------------------------------------------
-    data <- purrr::map_dfr(csv_files, readr::read_csv) %>% as_tibble()
+    # data <- purrr::map_dfr(csv_files, readr::read_csv) %>% as_tibble()
+    data <- data.table::rbindlist(
+        lapply(csv_files, function(f) {
+            x <- data.table::fread(f)
+
+            year <- sub(".*_(\\d{4})\\.csv$", "\\1", f)
+            message("Read year: ", year)
+
+            x
+        }),
+        use.names = TRUE,
+        fill = TRUE
+    )
+
+    # # --- Restrict to Xu spatial grid ----------------------------------------
+    # # Xu drops ocean/nodata cells (e.g. Western Sahara); Hu is complete.
+    # # For consistency with the adjacency matrix (built on the Xu grid),
+    # # filter all years to only lon/lat pairs that appear in the Xu data.
+    # xu_grid <- data %>%
+    #     filter(!is.na(fire_PM25)) %>%   # fire_PM25 is NA for 2020+ where Xu doesn't exist  #nolint
+    #     distinct(lon, lat)
+
+    # print(paste("Xu grid cells:", nrow(xu_grid)))
+    # print(paste("Total rows before filtering:", nrow(data)))
+    # data <- data |> semi_join(xu_grid, by = c("lon", "lat"))
+    # print(paste("Total rows after filtering to Xu grid:", nrow(data)))
+
+    # # --- Create grid IDs ----------------------------------------------------
+    # data <- data %>%
+    #     group_by(lon, lat) %>%
+    #     mutate(grid_id = cur_group_id()) %>%
+    #     ungroup()
+
+    # --- Restrict to Xu spatial grid ---------------------------------------
+    # Xu drops ocean/nodata cells (e.g. Western Sahara); Hu is complete.
+    # For consistency with the adjacency matrix (built on the Xu grid),
+    # filter all years to only lon/lat pairs that appear in the Xu data.
+    xu_grid <- unique(data[!is.na(fire_PM25), .(lon, lat)])
+
+    message("Xu grid cells: ", nrow(xu_grid))
+    message("Total rows before filtering: ", nrow(data))
+
+    data <- data[xu_grid, on = .(lon, lat), nomatch = 0]
+
+    message("Total rows after filtering to Xu grid: ", nrow(data))
 
     # --- Create grid IDs ----------------------------------------------------
-    data <- data %>%
-        group_by(lon, lat) %>%
-        mutate(grid_id = cur_group_id()) %>%
-        ungroup()
+    data[, grid_id := .GRP, by = .(lon, lat)]
+
+    # Convert to tibble
+    data <- tibble::as_tibble(data)
+
 
     # --- Rename Middle Africa and make factor ------------------------------
     data <- data %>%

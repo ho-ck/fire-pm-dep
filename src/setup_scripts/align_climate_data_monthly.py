@@ -1,10 +1,10 @@
 """
-Python script to align datasets: GFED4s, Global Fire Atlas, ERA5 montly 
-reanalysis to common Xu PM2.5 grid (0.25°). Saves output CSV files with 
-spatially aligned montly data for 2000-2019 (annual files). Uses rasterio
-WarpedVRT with bilinear interpolation resampling.
+Python script to align GFED4s and ERA5 montly reanalysis to common Xu PM2.5 grid
+(0.25°). Saves output CSV files with spatially aligned montly data for 2000-2019
+(annual files). Uses rasterio WarpedVRT with bilinear interpolation resampling.
 
 Date created: 26/08/2025
+Update: 28/07/2026 for Hu et al. data (2000-2023)
 """
 
 import os
@@ -14,24 +14,25 @@ import numpy as np
 import pandas as pd
 import h5py
 import pyreadr
-import rasterio
 from rasterio.transform import from_origin
 from rasterio.enums import Resampling
 from utils import resample_with_vrt, point_to_gridcell
 import xarray as xr
-from shapely.geometry import Point, box
+from shapely.geometry import Point
 from tqdm import tqdm
 
 # Paths
 DATA_PATH   = f'{os.getenv("SCRATCH_DIR")}/data/spatial'
 OUT_PATH    = os.path.join(DATA_PATH, 
-                           "fire_pm_dep_paper_data",    # dir for data for paper
-                           "regridded_climate_data")
+                           "fire_pm_dep_paper_data",    # dir for analysis data for paper
+                        #    "regridded_climate_data")
+                           "regridded_climate_data_2000_2023")  # Hu data (2000-2023)    
 
-GFED_DIR        = os.path.join(DATA_PATH, "GFED")
-XU_MONTHLY_DIR  = os.path.join(DATA_PATH, "monthly_pm25_xu")
-GFA_DIR         = os.path.join(DATA_PATH, "Global_Fire_Atlas") # Global Fire Atlas -- fire size and no. ignitions
-ERA5_PATH       = os.path.join(DATA_PATH, "ERA5/ERA5_monthly_averaged_reanalysis.grib") # includes wind, temp, dewpoint, pressure
+GFED_DIR    = os.path.join(DATA_PATH, "GFED")
+GFED_EMISSION_FACTORS_PATH = "/home/users/cho00/fire-pm-dep/src/setup_scripts/GFED4_Emission_Factors.txt"
+XU_MONTHLY_DIR      = os.path.join(DATA_PATH, "monthly_pm25_xu")
+HU_MONTHLY_DIR      = os.path.join(DATA_PATH, "pm25_hu_monthly")
+ERA5_PATH           = os.path.join(DATA_PATH, "ERA5/ERA5_monthly_averaged_reanalysis.grib") # includes wind, temp, dewpoint, pressure
 ERA5_PRECIP_PATH    = os.path.join(DATA_PATH, "ERA5/ERA5_monthly_averaged_reanalysis_precip.grib") # ERA5 precipitation file
 
 # Spatial resolutions (degrees)
@@ -42,7 +43,7 @@ era5_res    = 0.25
 # UPDATE 16/10: using NN resampling for GFED emissions to preserve spikes and zero-values
 GFED_RESAMPLING = Resampling.nearest
 
-def calculate_GFED_montly_emissions(year, GFED_path):
+def calculate_GFED_montly_emissions(year, GFED_path, GFED_emis_factors_path):
     """
     Calculates monthly PM emissions from GFED4.1s for a given year.
 
@@ -52,7 +53,8 @@ def calculate_GFED_montly_emissions(year, GFED_path):
 
     Parameters:
         year (int): Year to process (e.g., 2005).
-        GFED_path (str): Path to dir containing GFED4.1s data and emission factor file.
+        GFED_path (str): Path to dir containing GFED4.1s data.
+        GFED_emis_factors_path (str): Path to text file containing emission factors.
 
     Returns:
         dict: A dictionary mapping each month (0-11) to:
@@ -73,7 +75,7 @@ def calculate_GFED_montly_emissions(year, GFED_path):
     EFs     = np.zeros((41, 6)) # 41 species, 6 sources
 
     k = 0
-    f = open(directory+'/GFED4_Emission_Factors.txt')
+    f = open(GFED_emis_factors_path)
     while 1:
         line = f.readline()
         if line == "":
@@ -145,10 +147,27 @@ def concat_xu_montly_pm25(year, xu_montly_path):
 
     return xu_pm25_monthly
 
-
-def process_month(month, year, xu_pm25_dict, GFED_dict, gfa_ignitions_src, gfa_size_src, era5_ds, era5_precip_ds):
+def concat_hu_monthly_pm25(year, hu_monthly_path):
     """
-    Spatially aligns GFED, GFA, ERA5 for a given month and year to the Xu PM2.5 grid, using WarpedVRT resampling with 
+    Loads and concats monthly Hu et al. fire PM2.5 CSVs for a given year.
+    Returns dict keyed by month index (0-11).
+    """
+    hu_pm25_monthly = {}
+    for month in tqdm(range(12)):
+        df = pd.read_csv(os.path.join(
+            hu_monthly_path,
+            f"fire_pm25_hu_monthly_{year}_{str(month+1).zfill(2)}.csv"
+        ))
+        df = df.rename(columns={"pm25": "fire_PM25_hu"})
+        df['month'] = month
+        df['year'] = year
+        hu_pm25_monthly[month] = df
+
+    return hu_pm25_monthly
+
+def process_month(month, year, xu_pm25_dict, hu_pm25_dict, GFED_dict, era5_ds, era5_precip_ds):
+    """
+    Spatially aligns GFED, ERA5 for a given month and year to the Xu PM2.5 grid, using WarpedVRT resampling with 
     bilinear interpolation.
 
     Parameters:
@@ -156,8 +175,6 @@ def process_month(month, year, xu_pm25_dict, GFED_dict, gfa_ignitions_src, gfa_s
         year (int): Year of the data to process (e.g., 2003).
         xu_pm25_dict (dict): Dictionary of monthly Xu PM2.5 DataFrames for a given year, keyed by month index.
         GFED_dict (dict): Dictionary of GFED emission DataFrames for a given year, keyed by month index.
-        gfa_ignitions_src (rasterio.DatasetReader): Global Fire Atlas ignitions raster with 12 monthly bands (1-12).
-        gfa_size_src (rasterio.DatasetReader): Global Fire Atlas average fire size raster with 12 monthly bands (1-12).
         era5_ds (xarray.Dataset): ERA5 dataset with monthly wind data ('u10', 'v10') from 2000–2019, indexed by datetime.
 
     Returns:
@@ -165,8 +182,15 @@ def process_month(month, year, xu_pm25_dict, GFED_dict, gfa_ignitions_src, gfa_s
                       including geometry column (WKT grid cells).
     """
 
-    ### --- 1. Define target grid (Xu) ---
-    df_xu   = xu_pm25_dict[month]
+    ### --- 1. Define target grid (Xu/Hu) ---
+    df_hu = hu_pm25_dict[month]
+    if year <= 2019:
+        # Get Xu data if they exist
+        df_xu = xu_pm25_dict[month]
+        df_hu = pd.merge(df_xu, df_hu, on=["lon", "lat", "month", "year"])
+
+    df_xu = df_hu.copy() # use as target grid for remainder of function (uses Xu grid for 2000-2019, Hu grid for 2020-2023)
+
     lons_xu = np.sort(df_xu['lon'].unique())
     lats_xu = np.sort(df_xu['lat'].unique())[::-1]
     width_xu    = len(lons_xu) # no. of grid cells
@@ -219,54 +243,8 @@ def process_month(month, year, xu_pm25_dict, GFED_dict, gfa_ignitions_src, gfa_s
     })
     df_xu = df_xu.merge(df_gfed_aligned, on=['lon', 'lat', 'month', 'year'])
 
-    # --- 3. Align Global Fire Atlas to Xu ---
-    if gfa_ignitions_src is not None and gfa_size_src is not None: # datasets will be None for years outside of 2003-2016 (inclusive)
-        # Resample ignitions
-        gfa_ignitions_resampled = resample_with_vrt(
-            data_array      = gfa_ignitions_src.read(month+1), # monthly bands are 1-indexed
-            src_transform   = gfa_ignitions_src.transform,
-            src_nodata      = gfa_ignitions_src.nodata,
-            out_transform   = transform_xu,
-            out_width       = width_xu,
-            out_height      = height_xu,
-            resampling_func = Resampling.bilinear,
-            out_nodata      = np.nan
-        )
 
-        # Resample fire size
-        gfa_size_resampled = resample_with_vrt(
-            data_array      = gfa_size_src.read(month+1),
-            src_transform   = gfa_size_src.transform,
-            src_nodata      = gfa_size_src.nodata,
-            out_transform   = transform_xu,
-            out_width       = width_xu,
-            out_height      = height_xu,
-            resampling_func = Resampling.bilinear,
-            out_nodata      = np.nan
-        )
-
-        # Convert back to dataframe and join onto Xu
-        df_gfa_aligned = pd.DataFrame({
-            'lon': lon_grid_xu.ravel(),
-            'lat': lat_grid_xu.ravel(),
-            'gfa_n_ignitions': gfa_ignitions_resampled.ravel(),
-            'gfa_avg_fire_size': gfa_size_resampled.ravel(),
-            'month': month,
-            'year': year,
-        })
-    else:
-        # Fill with NaNs if no GFA data
-        df_gfa_aligned = pd.DataFrame({
-            'lon': lon_grid_xu.ravel(),
-            'lat': lat_grid_xu.ravel(),
-            'gfa_n_ignitions': np.nan,
-            'gfa_avg_fire_size': np.nan,
-            'month': month,
-            'year': year,
-        })
-    df_xu = df_xu.merge(df_gfa_aligned, on=['lon', 'lat', 'month', 'year'])
-
-    # --- 4. Align ERA5 winds to Xu ---
+    # --- 3. Align ERA5 winds to Xu ---
     # Select year and month (day is always 01 for monthly-averaged ERA5)
     time_sel        = np.datetime64(f"{year}-{str(month+1).zfill(2)}-01") # convert month '0' to '01' etc.
     era5_sel        = era5_ds.sel(time=time_sel)
@@ -384,7 +362,7 @@ def process_month(month, year, xu_pm25_dict, GFED_dict, gfa_ignitions_src, gfa_s
     })
     df_xu = df_xu.merge(df_era5_aligned, on=['lon', 'lat', 'month', 'year'])
 
-    ### --- 5. Create shapely geometries (for geopandas, sf later) ---
+    ### --- 4. Create shapely geometries (for geopandas, sf later) ---
     # Create Point geometries
     df_xu['geometry'] = df_xu.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
 
@@ -401,13 +379,19 @@ def main():
     # Create the output dir if it doesn't exist
     if not os.path.exists(OUT_PATH):
         os.makedirs(OUT_PATH, exist_ok=True)
-    
-    # Get the task ID from the SLURM array task ID environment variable -- CHRIS NOTE 26/08: I would have preferred to do this (parallel across years) but SLURM queue was too long to submit batch job (so just ran in interactive terminal).
-    task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
 
-    # The years correspond to task IDs (0-19 corresponds to 2000-2019)
+    # Get the task ID from the SLURM array task ID environment variable
+    task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
+    
+    # The years correspond to task IDs (0-23 corresponds to 2000-2023)
     year = 2000 + task_id
 
+    # Name of output file
+    out_file = os.path.join(OUT_PATH, f"monthly_xu_pm25_gfed_era5_{year}.csv")
+    if os.path.exists(out_file):
+        print(f"Output for {year} already exists. Finishing...")
+        return
+    
     ### --- Load ERA5 data (contains all years) ---
     print("Loading ERA5...", flush=True)
     era5 = xr.load_dataset(ERA5_PATH, engine="cfgrib")
@@ -431,19 +415,18 @@ def main():
     # for year in range(2000, 2020):
 
     ### --- 0. Load monthly data for the year ---
-    print("Loading Xu...", flush=True)
-    xu_pm25_monthly = concat_xu_montly_pm25(year, XU_MONTHLY_DIR)
-    print("Loading GFED...", flush=True)
-    GFED_monthly = calculate_GFED_montly_emissions(year, GFED_DIR)
-    
-    print("Loading GFA...", flush=True)
-    # Load GFA rasters only if year is within 2003-2016
-    if 2003 <= year <= 2016:
-        gfa_ignitions_src = rasterio.open(os.path.join(GFA_DIR, f"Global_fire_atlas_ignitions_monthly_{year}.tif"))
-        gfa_size_src = rasterio.open(os.path.join(GFA_DIR, f"Global_fire_atlas_size_monthly_{year}.tif"))
+    print("Loading Hu...", flush=True)
+    hu_pm25_monthly = concat_hu_monthly_pm25(year, HU_MONTHLY_DIR)
+
+    if year <= 2019:
+        print("Loading Xu...", flush=True)
+        xu_pm25_monthly = concat_xu_montly_pm25(year, XU_MONTHLY_DIR)
     else:
-        gfa_ignitions_src = None
-        gfa_size_src = None
+        xu_pm25_monthly = None  # not used for 2020+
+
+    print("Loading GFED...", flush=True)
+    GFED_monthly = calculate_GFED_montly_emissions(year, GFED_DIR, GFED_EMISSION_FACTORS_PATH)
+    
 
     ### --- 1. Loop through months and do regridding / resampling ---
     print("Doing monthly regridding...", flush=True)
@@ -451,9 +434,8 @@ def main():
     for month in tqdm(range(0, 12)):
 
         df_month = process_month(
-            month, year, xu_pm25_dict=xu_pm25_monthly, GFED_dict=GFED_monthly,
-            gfa_ignitions_src=gfa_ignitions_src, gfa_size_src=gfa_size_src, era5_ds=era5,
-            era5_precip_ds=era5_precip
+            month, year, xu_pm25_dict=xu_pm25_monthly, hu_pm25_dict=hu_pm25_monthly,
+            GFED_dict=GFED_monthly, era5_ds=era5, era5_precip_ds=era5_precip
         )
 
         monthly_dfs.append(df_month)
@@ -463,7 +445,7 @@ def main():
 
     ### -- 3. Export to CSV ---
     print("Writing to CSV...")
-    df_full_year.to_csv(os.path.join(OUT_PATH, f"monthly_xu_pm25_gfed_gfa_era5_{year}.csv"), index=False)
+    df_full_year.to_csv(out_file, index=False)
     print(f"Written to CSV. Data processing for year: {year} completed.")
 
 

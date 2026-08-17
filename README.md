@@ -9,8 +9,8 @@ Setup scripts (`src/setup_scripts/`):
 
 1. `download_data.py`
 2. `create_urban_pop_tifs.py`       # NOTE 06/07/2026: could be folded into the below
-3. `create_annual_global_data.py`   # global annual datasets with fire PM and socioeconomic data
-4. TODO: `prepare_africa_data.py`   # filter for Africa, create derived variables: child dependency pct, log GDP pc, percentages from prevalences etc.
+3. `create_annual_pm_se_data.py`    # global annual datasets with fire PM and socioeconomic data
+4. `prepare_africa_data.py`         # filter for Africa, create derived variables: child dependency pct, log GDP pc, percentages from prevalences etc.
 
 5. `align_climate_data_monthly.py`  # independent of socioeconomic data (saves annual files, each with 12mos of data)
 6. `transported_gfed_emissions.py`  # creates the wind-weighted distance band predictors (saves annual files, each with 12mos of data)

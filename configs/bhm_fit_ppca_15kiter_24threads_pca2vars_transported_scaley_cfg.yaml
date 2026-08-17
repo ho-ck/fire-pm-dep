@@ -1,0 +1,49 @@
+# Config file for original model: no grid-level REs
+# bc_attr_fire_PM25_emis_100_2000km as output (bias-corrected estimate of transported fire_PM25).
+# ^^scaled dependent variable -- units expressed in SDs relative to continent mean.
+# Using probabilistic PCA deprivation index (missing data imputation for san. acc.).
+project:
+  data_filepath: "/work/scratch-pw5/cho00/data/spatial/fire_pm_dep_paper_data/proc_data/df_af_annual_loc_tp.csv" # estimated by the INLA model   # "/work/scratch-pw4/cho00/data/spatial/transported_pm_inla/df_af_annual_loc_tp.csv" 
+  model_save_dir: "/work/scratch-pw5/cho00/data/spatial/deprivation_pm_bhm"                               # "/work/scratch-pw4/cho00/data/spatial/deprivation_pm_bhm"
+  nat_bounds_filepath: "/work/scratch-pw5/cho00/data/spatial/nat_boundaries/WB_countries_Admin0_10m"      # "/work/scratch-pw4/cho00/data/spatial/nat_boundaries/WB_countries_Admin0_10m"
+
+environment:
+  cmdstan_path: "/home/users/cho00/miniconda3/envs/ppca/bin/cmdstan"
+  proj_data: "/home/users/cho00/miniconda3/envs/ppca/share/proj"
+
+mcmc:
+  chains: 4
+  iter: 15000
+  warmup: 5000
+  threads: 24
+  adapt_delta: 0.95
+
+priors:
+  beta_sd: 10
+  scale_dist: "cauchy"
+
+data:
+  se_indicators:
+    - "log_GDP_pc"
+    - "child_dep_pct"
+  centre_year: true
+  scale_PC1: true
+  scale_y: true
+  max_year: 2019
+
+pca:
+  method: "ppca"  # probabilistic PCA
+  n_pcs: 2
+  scale: true
+  centre: true
+  seed: 42
+  pc1_positive_loadings: ["child_dep_pct"]
+  pc1_negative_loadings: ["log_GDP_pc"]
+
+model:
+  name: "original_model"
+  description: "No grid-level REs"
+  outcome: "bc_attr_fire_PM25_emis_100_2000km"
+  formula_rhs: >
+      0 + Intercept + PC1 * urban_rural_cat + year +
+        (1 + PC1 * urban_rural_cat + year | country)

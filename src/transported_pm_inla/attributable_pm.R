@@ -32,7 +32,7 @@ get_transformed_emis_coefs <- function(model, emis_data) {
     emis_coef
 }
 
-attr_pm_frac_by_band <- function(emis_coef, emis_data) {
+attr_pm_frac_by_band <- function(emis_coef, emis_data, outcome = "fire_PM25") {
     # Use fitted regression coefficients to estimate:
     # - 1. Attributable fire PM2.5 for each band (coef_band * Emis_band)
     # - 2. Attributable fractions of fire PM2.5 from each emissions band
@@ -68,7 +68,7 @@ attr_pm_frac_by_band <- function(emis_coef, emis_data) {
     # estimates by band attributable fractions)
     for ( var in emis_coef$term ) {
         data_aug[[ paste0("bc_attr_fire_PM25_", var) ]] <- 
-            data_aug[[ paste0("frac_fire_PM25_", var) ]] * data_aug$fire_PM25
+            data_aug[[ paste0("frac_fire_PM25_", var) ]] * data_aug[[outcome]]
     }
 
     # Return the attributable PM/frac/bc-PM cols

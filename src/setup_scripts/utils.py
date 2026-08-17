@@ -1,11 +1,7 @@
 import numpy as np
-import pandas as pd
-import warnings
 from tqdm import tqdm
-from rasterstats import gen_zonal_stats, zonal_stats
+from rasterstats import gen_zonal_stats
 from shapely.geometry import box
-import geopandas as gpd
-from rapidfuzz import fuzz, process
 
 from rasterio.io import MemoryFile
 from rasterio.enums import Resampling

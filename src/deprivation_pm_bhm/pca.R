@@ -69,7 +69,7 @@ compute_pca <- function(df, se_indicators, n_pcs,
 
 
 # --- Helper to write out PCA results (loadings + var explained) ---------------
-save_pca_res <- function(pca, method, out_dir) {
+save_pca_res <- function(pca, method, n_pcs, out_dir) {
     # Loadings
     pc_loadings             <- as.data.frame(pca@loadings)
     colnames(pc_loadings)   <- paste0("PC", seq_len(ncol(pc_loadings)))
@@ -77,7 +77,7 @@ save_pca_res <- function(pca, method, out_dir) {
 
     readr::write_csv(
         pc_loadings,
-        file.path(out_dir, paste0(method, "_loadings.csv"))
+        file.path(out_dir, paste0(method, "_loadings_", n_pcs, ".csv"))
     )
 
     # Proportion of variance explained
@@ -95,7 +95,7 @@ save_pca_res <- function(pca, method, out_dir) {
     
     write_csv(
         var_expl,
-        file.path(out_dir, paste0(method, "_var_explained.csv"))
+        file.path(out_dir, paste0(method, "_var_explained_", n_pcs, ".csv"))
     )
 }
 

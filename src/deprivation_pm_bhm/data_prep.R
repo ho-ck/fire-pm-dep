@@ -9,7 +9,7 @@
 # PC1 (i.e., complete socioeconomic data). Thus, re-create the grid_id's of 'df'
 # to match the model data, i.e., grid_id's for non-NA PC1.
 prepare_analysis_data <- function(df, df_pca, 
-    outcome = NA_character_, scale_y = FALSE, scale_PC1 = TRUE) {
+    outcome = NA_character_, scale_y = FALSE, scale_PC1 = TRUE, n_pcs = 5) {
     df_pca  <- df_pca %>%   # contains only non-NA PC1 (523,116 rows)
         filter(!is.na(urban_rural)) %>% 
         group_by(lon, lat) %>% 
@@ -23,10 +23,13 @@ prepare_analysis_data <- function(df, df_pca,
     }
     
     # Join PCs back onto df
+    if ("grid_id" %in% names(df)) {
+        df <- df |> select(-grid_id)    # remove pre-existing grid IDs, replace with the IDs consistent with the model # nolint
+    }
+    
     df  <- df %>% 
-        select(-grid_id) %>%    # remove pre-existing grid IDs, replace with the IDs consistent with the model # nolint
         left_join(    
-            df_pca %>% select(lon, lat, year, grid_id, paste0("PC", 1:5)),
+            df_pca %>% select(lon, lat, year, grid_id, paste0("PC", 1:n_pcs)),
             by = c("year", "lon", "lat")
         )
     
@@ -77,6 +80,50 @@ prepare_model_data <- function(
 }
 
 
+forecast_indicator_lmer <- function(df, var, max_year) {
+    # Projects a socioeconomic indicator forward beyond max_year using a
+    # mixed-effects model with a linear time trend and grid-level random
+    # intercepts and slopes.
+    # Only grid cells with observed historical data are projected.
+    
+    model <- lme4::lmer(
+        as.formula(paste(var, "~ year_c + (year_c | grid_id)")),
+        data = df |> filter(year <= max_year, !is.na(.data[[var]]))
+    )
+
+    observed_grids <- df |>
+        filter(year <= max_year, !is.na(.data[[var]])) |>
+        distinct(grid_id) |>
+        pull(grid_id)
+
+    idx <- which(
+        df$year > max_year &
+        is.na(df[[var]])   &
+        df$grid_id %in% observed_grids
+    )
+
+    df[[var]][idx] <- predict(model, newdata = df[idx, ], re.form = NULL)
+
+    df
+}
+
+
+project_indicators <- function(df, projections) {
+    # projections: named list of indicator -> max observed year, e.g.:
+    #   list(edu_mean_years = 2017, imp_san_access_pct = 2017, ...)
+    
+    # Centred year needed for lmer trend term
+    df <- df |> mutate(year_c = year - mean(year))
+
+    for (var in names(projections)) {
+        max_year <- projections[[var]]
+        print(paste("Projecting", var, "forward from", max_year))
+        df <- forecast_indicator_lmer(df, var, max_year)
+    }
+
+    df
+}
+
 # --- Helper: do PCA -----------------------------------------------------------
 # Computes PCA and returns both PCA object and augmented df
 DEPRECEATED__compute_pca <- function(df, se_indicators) {
@@ -96,4 +143,3 @@ DEPRECEATED__compute_pca <- function(df, se_indicators) {
     
     list(data = df_aug, pca = pca)
 }
-

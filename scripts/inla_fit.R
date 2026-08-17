@@ -40,12 +40,14 @@ if (!dir.exists(dirname(model_filepath))) {
     dir.create(dirname(model_filepath), recursive = TRUE)
 }
 
+outcome <- cfg$data$outcome
+logging("Outcome variable:", outcome)
+
 # --- Load PM & GFED emissions (monthly) data and wrangle ----------------------
 yrs  <- cfg$data$years
 logging("Loading data for years:", yrs$start, "-", yrs$end)
 
-data <- load_data_and_wrangle(data_dir, 
-                              years_sel = yrs$start : yrs$end )
+data <- load_data_and_wrangle(data_dir, years_sel = yrs$start : yrs$end )
 
 # --- Build adjacency matrix if doesn't already exist --------------------------
 adj_path <- cfg$data$adj_path
@@ -93,13 +95,15 @@ hyper_sigma <- list(
 # --- Fit INLA model -----------------------------------------------------------
 logging("Fitting INLA model...")
 
-formula <- fire_PM25 ~
-    emis_0_20km + emis_20_100km + emis_100_200km + emis_200_350km +
-    emis_350_500km + emis_500_750km + emis_750_1000km +
-    emis_1000_1500km + emis_1500_2000km +
-    u10 + v10 + d2m + t2m + sp + tp +
-    f(grid_id, model = "bym2", graph = adj_path, scale.model = TRUE,
-      hyper = hyper_bym2)
+formula <- as.formula(paste(
+    outcome, "~",
+    "emis_0_20km + emis_20_100km + emis_100_200km + emis_200_350km +",
+    "emis_350_500km + emis_500_750km + emis_750_1000km +",
+    "emis_1000_1500km + emis_1500_2000km +",
+    "u10 + v10 + d2m + t2m + sp + tp +",
+    "f(grid_id, model = 'bym2', graph = adj_path, scale.model = TRUE,",
+    "  hyper = hyper_bym2)"
+))
 
 model <- inla(
     formula,

@@ -17,7 +17,8 @@ conda activate inla
 cd "/home/users/cho00/fire-pm-dep"
 
 CONFIGS=(
-  "configs/inla_fit_cfg.yaml"
+  # "configs/inla_fit_global_emis_cfg.yaml"
+  "configs/inla_fit_hu.yaml"
 )
 
 # Select config for this array task

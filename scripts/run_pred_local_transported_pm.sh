@@ -17,7 +17,9 @@ conda activate inla
 cd "/home/users/cho00/fire-pm-dep"
 
 CONFIGS=(
-  "configs/inla_pred_local_transported_cfg.yaml"
+  # "configs/inla_pred_local_transported_cfg.yaml"
+  # "configs/inla_pred_loc_tp_global_emis_cfg.yaml"
+  "configs/inla_pred_loc_tp_hu.yaml"
 )
 
 # Select config for this array task

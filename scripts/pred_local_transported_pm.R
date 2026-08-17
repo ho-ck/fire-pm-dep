@@ -44,6 +44,9 @@ if (!dir.exists(dirname(out_data_filepath))) {
     dir.create(dirname(out_data_filepath), recursive = TRUE)
 }
 
+# Set outcome variable (Xu fire_PM or Hu)
+outcome <- if (!is.null(cfg$data$outcome)) cfg$data$outcome else "fire_PM25"
+
 # --- Load PM & GFED emissions (monthly) data and wrangle ----------------------
 yrs  <- cfg$data$years
 logging("Loading data for years:", yrs$start, "-", yrs$end)
@@ -75,7 +78,7 @@ logging("Estimating monthly attributable local/transported PM2.5...")
 # Regression coefficients for emissions bands, transformed to orig scale
 emis_coef       <- get_transformed_emis_coefs(model, emis_data)
 
-attr_pm_frac    <- attr_pm_frac_by_band(emis_coef, emis_data)
+attr_pm_frac    <- attr_pm_frac_by_band(emis_coef, emis_data, outcome)
 result_data     <- bind_cols(result_data, attr_pm_frac)
 
 # --- Aggregate by year --------------------------------------------------------

@@ -1,15 +1,16 @@
 """
 Python script to compute sums of wind alignment-weighted neighbouring fire
-emissions for all receptor grid cells (Africa, 2000-2019 monthly). Saves annual
-output CSV files (each annual file containing all months 0-11).
+emissions for African receptor grid cells (2000-2019 monthly). Source grid
+cells are not restricted to Africa, so transported emissions from nearby
+non-African cells can contribute to African receptors. Saves annual output CSV
+files (each annual file containing all months 0-11).
 
-Note this is an updated version of `transported_gfed_emissions.py`. Here, 
-emissions are calculated for several 'bands' of surrounding grids (sources):
-0-50km, 50-100km, 100-200km, 200-350km, 250-500km, 500-750km, 750-1000km,
+Emissions are calculated for several 'bands' of surrounding grids (sources):
+20-50km, 50-100km, 100-200km, 200-350km, 350-500km, 500-750km, 750-1000km,
 1000-1500km, 1500-2000, 2000-3000km, 3000-5000km.
 
-*v3 update -- also sum transported emissions by region, so can decompose into 
-components emissions originating from each source region*
+Also option to sum transported emissions by region/country, so can decompose 
+into pollution components originating from each source region*
 
 Date created: 30/10/2025
 """
@@ -19,412 +20,367 @@ os.environ['PROJ_DATA'] = '/home/users/cho00/miniconda3/envs/pm/share/proj' # se
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from pyproj import Transformer
 from tobler.area_weighted import area_join
 from scipy.spatial import KDTree
 from tqdm import tqdm
-import dask
-import dask.delayed
-from dask.diagnostics import ProgressBar
+# import dask
+# import dask.delayed
+# from dask.diagnostics import ProgressBar
 
-DATA_PATH   = f'{os.getenv("SCRATCH_DIR")}/data/spatial'
-OUT_PATH    = os.path.join(DATA_PATH, 
-                           "fire_pm_dep_paper_data",    # dir for data for paper
-                           "transported_GFED_emissions_regional")  # transported emissions binned by source region
-# OUT_PATH  = os.path.join(DATA_PATH, "transported_GFED_emissions_country")  # transported emissions binned by source country
+DATA_PATH       = f'{os.getenv("SCRATCH_DIR")}/data/spatial'
+OUT_PATH        = os.path.join(DATA_PATH, 
+                               "fire_pm_dep_paper_data",                    # dir for data for paper
+                            #    "transported_GFED_emissions_incl_global")    # transported emissions binned by source region, include global (non-Africa) sources
+                               "transported_GFED_emissions_incl_global_2000_2023")  # update include GFED time series for 2000-2023
+
 INPUT_DATA_DIR  = os.path.join(DATA_PATH, 
                                "fire_pm_dep_paper_data",
-                               "regridded_climate_data") # includes mass of GFED PM2.5 emissions (g PM2.5 per month) (instead of just mass flux). Also includes ERA5 precipitation
+                            #    "regridded_climate_data")
+                               "regridded_climate_data_2000_2023")
 NAT_BOUNDS_PATH = os.path.join(DATA_PATH, "nat_boundaries/WB_countries_Admin0_10m")
 
-# Update 17/11 -- source contributions by country (instead of UN subregion)
-BIN_BY_COUNTRY = False
+
+# Source contribution groups. Use "region", "country", another source_gdf column,
+# an array/Series of labels, or None to skip grouped source contributions.
+SOURCE_GROUPS = "region"
 
 # Transported emissions bands (km)
-thresholds = [50, 100, 200, 350, 500, 750, 1000, 1500, 2000, 3000, 5000]
+# THRESHOLDS = [50, 100, 200, 350, 500, 750, 1000, 1500, 2000, 3000, 5000]
+THRESHOLDS = [50, 100, 200, 350, 500, 750, 1000, 1500, 2000]
 
-# Lower bounds for each band (20km -- half a grid cell diagonal -- for the first one)
-lower_bounds = np.insert(thresholds[:-1], 0, 20)
+# Lower bounds for each band (20km  for the first one [half a grid cell diagonal])
+LOWER_BOUNDS = np.insert(THRESHOLDS[:-1], 0, 20)
 
 
-def distanceband_neighbours(coords, thresholds, lower_bounds):
+def find_distanceband_sources(
+    receptor_coords, source_coords, thresholds, lower_bounds, receptor_source_indices=None
+):
     """
-    Fully vectorised: Finds neighbour grid cells within specified distance bands for each point.
+    For each receptor, find source-receptor pairs within each distance band.
 
     Parameters:
-        coords (np.ndarray): Array of shape (n_points, 2) in projected units (meters).
+        receptor_coords (np.ndarray): Array of shape (n_receptors, 2) in projected units (meters).
+        source_coords (np.ndarray): Array of shape (n_sources, 2) in projected units (meters).
         thresholds (list or np.ndarray): Upper bounds of distance bands in meters.
         lower_bounds (list or np.ndarray): Lower bounds for each distance band in meters.
+        receptor_source_indices (np.ndarray, optional): For each receptor row, the matching
+            source-row index. Used to exclude self-pairs when receptors are a subset of sources.
 
     Returns:
-        dict: {band_upperbound_km: {point_index: [neighbour_indices]}} for each distance band.
+        dict: {band_upperbound_km: (receptor_indices, source_indices)} for each distance band.
     """
     # Create KDTree to find each coord's neighbours up to max dist
-    tree = KDTree(coords)
+    tree = KDTree(source_coords)
     max_dist = thresholds[-1]
 
-    # Get neighbour indices (ragged list) up to max threshold
-    neighbours_list = tree.query_ball_point(coords, r=max_dist)
+    # Ragged list: one source-index list per receptor, up to the largest band
+    sources_list = tree.query_ball_point(receptor_coords, r=max_dist)
 
+    if len(sources_list) == 0:
+        return {int(upper / 1e3): (np.array([], dtype=int), np.array([], dtype=int))
+                for upper in thresholds}
+   
     # Flatten to get full (i, j) pairs -- each entry corresponds to an i-j pair, index by receptor i
-    i_indices = np.repeat(np.arange(len(neighbours_list)), [len(nbs) for nbs in neighbours_list]) # repeat each receptor index i for the number of neighbours (sources) j it has
-    j_indices = np.concatenate(neighbours_list) # stack all the lists of neighbours (j's)
+    i_indices = np.repeat(
+        # repeat each receptor index i for the number of sources j it has
+        np.arange(len(sources_list)),
+        [len(srcs) for srcs in sources_list]
+    )
+    j_indices = np.concatenate(sources_list).astype(int) # stack all the lists of sources (j's)
 
-    # Exclude self-pairs (KDTree finds self-pairs)
-    valid = i_indices != j_indices
-    i_indices = i_indices[valid]
-    j_indices = j_indices[valid]
+    # Exclude the receptor cell itself when receptors are drawn from the source grid
+    if receptor_source_indices is not None:
+        valid = j_indices != receptor_source_indices[i_indices]
+        i_indices = i_indices[valid]
+        j_indices = j_indices[valid]
 
-    # Compute distances vectorized
-    disp_vecs = coords[j_indices] - coords[i_indices] # dx, dy
+    # Compute receptor-source distances vectorised
+    disp_vecs = source_coords[j_indices] - receptor_coords[i_indices]
     dists = np.linalg.norm(disp_vecs, axis=1)
 
-    # Dict to store neighbour dicts for each band
-    bands_nb_dicts = {}
+    # Dict to store receptor-source pairs for each band
+    band_pairs = {}
 
-    # Loop through radius 'bands' and find neighbour dicts in band
+    # Loop through radius 'bands' and bin receptor-source pairs in bands based on distance
     for lower, upper in tqdm(zip(lower_bounds, thresholds), total=len(thresholds)):
         in_band = (dists > lower) & (dists <= upper)
-        band_i = i_indices[in_band]
-        band_j = j_indices[in_band]
+        band_pairs[int(upper / 1e3)] = (i_indices[in_band], j_indices[in_band])
 
-        # Group by i using a dict ( so will be {receptor_idx (i): [list of source_idxs (j's)]} )
-        nb_dict = {i: [] for i in range(coords.shape[0])}
-        for i, j in zip(band_i, band_j):
-            nb_dict[i].append(j)
-
-        bands_nb_dicts[int(upper / 1e3)] = nb_dict # keys in km
-
-    return bands_nb_dicts  # {band_uppperbound: {receptor_idx: [source_idxs]}} 
+    return band_pairs   # {band_uppperbound: (receptor_indices, source_indices)}
 
 
-def sum_wind_weighted_emissions_by_region(
-    coords, u_wind, v_wind, gfed_emissions, bands_nb_dicts, regions, return_source_counts=False
+def sum_wind_weighted_emissions(
+    receptor_coords, source_coords, u_wind, v_wind, gfed_emissions,
+    band_pairs, source_groups=None, return_source_counts=False
 ):
     """
-    Sums emissions from neighbouring grid cells for each distance band and per source region,
-    weighted by cosine similarity of wind direction and displacement vectors.
+    Sum source emissions by distance band for each receptor, weighted by the
+    cosine similarity between source wind direction and source-to-receptor
+    displacement vector.
 
     Parameters:
-        coords (np.ndarray): (n_points, 2) array of grid cell centroids in projected CRS (meters).
-        u_wind (np.ndarray): Eastward wind component at each source grid cell (length n_points).
-        v_wind (np.ndarray): Northward wind component at each source grid cell (length n_points).
-        gfed_emissions (np.ndarray): Emissions at each source grid cell (length n_points).
-        bands_nb_dicts (dict): Dict where each key is a distance band upper bound (in km),
-            and each value is a dict mapping point indices to lists of neighbouring indices in that band.
-        regions (np.ndarray): Array of region labels (length n_regions).
-        return_source_counts : (bool) If True, also return counts of contributing sources per band.
-        
+        receptor_coords (np.ndarray): (n_receptors, 2) receptor centroids in projected CRS.
+        source_coords (np.ndarray): (n_sources, 2) source centroids in projected CRS.
+        u_wind (np.ndarray): Eastward wind component at each source grid cell.
+        v_wind (np.ndarray): Northward wind component at each source grid cell.
+        gfed_emissions (np.ndarray): Emissions at each source grid cell.
+        band_pairs (dict): {band_upperbound_km: (receptor_indices, source_indices)}.
+        source_groups (np.ndarray, optional): Group label for each source grid cell.
+        return_source_counts (bool): If True, also return source counts per band.
 
     Returns:
         band_emissions : np.ndarray
-            Array of shape (n_points, n_bands) with summed wind alignment-weighted emissions per band.
+            Shape (n_receptors, n_bands), total weighted emissions per band.
         band_source_counts : np.ndarray (optional)
-            Array of shape (n_points, n_bands) of number of sources contributing to each receptor per band
-        region_emissions : np.ndarray
-            Array of shape (n_points, n_bands, n_regions) of summed wind alignment-weighted emissions per band per region
+            Shape (n_receptors, n_bands), number of source cells per band.
+        group_emissions : np.ndarray
+            Shape (n_receptors, n_bands, n_groups), weighted emissions per source group.
+        group_list : list
+            Sorted groups corresponding to the final axis of group_emissions.
     """
-    
-    n_receptors = coords.shape[0]
-    n_bands = len(bands_nb_dicts)
-    region_list = sorted(np.unique(regions[~pd.isna(regions)]))
-    n_regions = len(region_list)
+    n_receptors = receptor_coords.shape[0]
+    n_bands = len(band_pairs)
     
     # Empty array (n_grids, n_bands) to store the sum of weighted emissions per band
     band_emissions = np.zeros((n_receptors, n_bands))
-
+    
     # Empty array (n_grids, n_bands) to store the counts of emissions sources per band
-    if return_source_counts:
-        band_source_counts = np.zeros((n_receptors, n_bands))
+    band_source_counts = (
+        np.zeros((n_receptors, n_bands)) if return_source_counts else None
+    )
+
+    if source_groups is None:
+        # No source-group decomposition requested; only compute total emissions by band
+        group_list = []
+        group_codes = None
+        group_emissions = None
     else:
-        band_source_counts = None
-    
-    region_emissions = np.zeros((n_receptors, n_bands, n_regions))
-    
-    # Mapping of region name -> source idxs
-    region_idx_dict = {r: np.where(regions == r)[0] for r in region_list}
+        # Convert labels like "Northern Africa" etc into stable integer codes
+        source_groups = np.asarray(source_groups)
+        group_list = sorted(np.unique(source_groups[~pd.isna(source_groups)]))
+        group_to_code = {group: idx for idx, group in enumerate(group_list)}
+        
+        # One integer group code per source cell; missing groups get -1
+        group_codes = np.array(
+            [group_to_code.get(group, -1) for group in source_groups],
+            dtype=int
+        )
+        group_emissions = np.zeros((n_receptors, n_bands, len(group_list)))
 
     # Loop through bands
-    for band_idx, (upper, nb_dict) in enumerate(bands_nb_dicts.items()):
-        # Flatten i (receptor) and j (source) indices to get full (i, j pairs)
-        flat_i = np.repeat(np.arange(n_receptors), [len(nbs) for nbs in nb_dict.values()])  # repeat each receptor index i for the number of neighbours (sources) j it has
-        flat_j = np.concatenate(list(nb_dict.values())).astype(int)  # stack all the lists of neighbours (j's)
+    for band_idx, (upper, (flat_i, flat_j)) in enumerate(band_pairs.items()):
+        if len(flat_j) == 0:
+            # leave band_emissions as np.nan for receptor i with no sources j in band b
+            continue
 
-        if not flat_j.any():
-            continue # leave band_emissions as np.nan for receptor i with no neighbouring sources in band b
+        # Displacement vectors (source -> receptor)
+        # disp_vecs = receptor_coords[flat_i] - source_coords[flat_j]     # shape (n_pairs, 2)
+        disp_vecs = np.subtract(receptor_coords[flat_i], source_coords[flat_j]) # shape (n_pairs, 2)
         
-        # Vectorised displacement vectors (source -> receptor)
-        disp_vecs = coords[flat_i] - coords[flat_j]  # shape (n_pairs, 2)
-
         # Wind vectors at sources
         wind_vecs = np.stack([u_wind[flat_j], v_wind[flat_j]], axis=1)  # shape (n_pairs, 2)
 
         # Dot products of the wind and displacement vectors (2-element vectors)
-        dots = np.einsum('nm,nm->n', wind_vecs, disp_vecs)  # returns column of shape (n_pairs,)
+        dots = np.einsum('nm,nm->n', wind_vecs, disp_vecs)              # column of shape (n_pairs,)
         
         # Divide dots by norms of wind and disp vectors to get cosine similarity
-        norm_wind = np.linalg.norm(wind_vecs, axis=1)
-        norm_disp = np.linalg.norm(disp_vecs, axis=1)
-
-        # Avoid division by zero
-        denom = norm_wind * norm_disp
-        denom[denom == 0] = 1e-8
-
-        # Get cosine similarity
-        cos_sim = dots / denom  # cosine similarity, shape (n_pairs,)
+        denom = np.linalg.norm(wind_vecs, axis=1) * np.linalg.norm(disp_vecs, axis=1)
+        denom[denom == 0] = 1e-8    # avoid division by zero
+        cos_sim = dots / denom      # shape (n_pairs,)
 
         # Weight emissions by cosine similarity (with lowerbound zero to 'switch off' negative weights [downwind emissions])
         weighted_emissions = gfed_emissions[flat_j] * np.maximum(0, cos_sim)
-
-        # Sum weighted emissions by receptor index (i), across all sources for total band emission
-        sums_total = np.bincount(flat_i, weights=weighted_emissions, minlength=n_receptors)
-        band_emissions[:, band_idx] = sums_total  # store in output array
+        
+        # Sum weighted emissions by receptor index (i), across all sources for total band emissions
+        band_emissions[:, band_idx] = np.bincount(
+            flat_i, weights=weighted_emissions, minlength=n_receptors
+        )
 
         if return_source_counts:
-            counts = np.bincount(flat_i, minlength=n_receptors) # shape (n_grids,)
-            band_source_counts[:, band_idx] = counts
+            band_source_counts[:, band_idx] = np.bincount(flat_i, minlength=n_receptors)
 
-        # --- Sum emissions per region
-        for r_idx, r_name in enumerate(region_list):  # Loop over each source region by index and name
-            r_sources = region_idx_dict[r_name]  # Get indices of sources belonging to this region
-            in_region = np.isin(flat_j, r_sources)  # Boolean array: True where source is in the current region
-            if not np.any(in_region):  # Skip if no sources in this region for this band
-                continue
-            sums_r = np.bincount(flat_i[in_region], weights=weighted_emissions[in_region], minlength=n_receptors)  # Sum weighted emissions per receptor for this region
-            region_emissions[:, band_idx, r_idx] = sums_r  # Store summed emissions for all receptors, current band, current region
+        # Sum emissions by region or country grouping if desired
+        if group_codes is not None and len(group_list) > 0:
+            source_group_codes = group_codes[flat_j]
+            has_group = source_group_codes >= 0
+            if np.any(has_group):
+                combined_idx = (
+                    flat_i[has_group] * len(group_list) + source_group_codes[has_group]
+                )
+                group_sums = np.bincount(
+                    combined_idx,
+                    weights=weighted_emissions[has_group],
+                    minlength=n_receptors * len(group_list)
+                )
+                group_emissions[:, band_idx, :] = group_sums.reshape(
+                    n_receptors, len(group_list)
+                )
 
-    return (band_emissions, band_source_counts, region_emissions)
+    return band_emissions, band_source_counts, group_emissions, group_list
 
 
-def sum_wind_weighted_emissions_by_country(
-    coords, u_wind, v_wind, gfed_emissions, bands_nb_dicts, countries, return_source_counts=False
-):
+
+def make_band_dataframe(values, prefix, thresholds, lower_bounds):
+    """Convert receptor x aggregated band values (emissions/counts) to a DataFrame with distance-band column names."""
+    return pd.DataFrame(
+        values,
+        columns=[
+            f"{prefix}_{lower_bounds[b]}_{thresholds[b]}km"
+            for b in range(len(thresholds))
+        ]
+    )
+
+def make_group_band_dataframe(values, groups, thresholds, lower_bounds):
+    """Convert receptor x band x source-group values to wide band-group columns."""
+    if values is None or len(groups) == 0:
+        return pd.DataFrame(index=range(values.shape[0] if values is not None else 0))
+
+    colnames = [
+        f"emis_{lower_bounds[b]}_{thresholds[b]}km_{groups[group_idx]}" # Column names for each band–region (or country) combination
+        for b in range(len(thresholds))
+        for group_idx in range(len(groups)) # cols are band0_region0, band0_region1, band0_region2, ..., band1_region0, band1_region1, band1_region2, ... etc. (i.e., unnest region index fastest)
+    ]
+    return pd.DataFrame(values.reshape(values.shape[0], -1), columns=colnames)  # Reshape from (N, B, R) to (N, B×R) -- unnests the last index (region) fastest
+
+
+def resolve_source_groups(source_gdf, source_groups):
     """
-    Sums emissions from neighbouring grid cells for each distance band and per source country,
-    weighted by cosine similarity of wind direction and displacement vectors.
+    Return one source-group label per source row.
 
-    Parameters:
-        coords (np.ndarray): (n_points, 2) array of grid cell centroids in projected CRS (meters).
-        u_wind (np.ndarray): Eastward wind component at each source grid cell (length n_points).
-        v_wind (np.ndarray): Northward wind component at each source grid cell (length n_points).
-        gfed_emissions (np.ndarray): Emissions at each source grid cell (length n_points).
-        bands_nb_dicts (dict): Dict where each key is a distance band upper bound (in km),
-            and each value is a dict mapping point indices to lists of neighbouring indices in that band.
-        country (np.ndarray): Array of countr labels (length n_countries).
-        return_source_counts : (bool) If True, also return counts of contributing sources per band.
-        
-
-    Returns:
-        band_emissions : np.ndarray
-            Array of shape (n_points, n_bands) with summed wind alignment-weighted emissions per band.
-        band_source_counts : np.ndarray (optional)
-            Array of shape (n_points, n_bands) of number of sources contributing to each receptor per band
-        region_emissions : np.ndarray
-            Array of shape (n_points, n_bands, n_countries) of summed wind alignment-weighted emissions per band per country
+    source_groups can be a column name, an array/Series aligned to source_gdf rows,
+    or None to skip grouped source decomposition.
     """
-    
-    n_receptors = coords.shape[0]
-    n_bands = len(bands_nb_dicts)
-    country_list = sorted(np.unique(countries[~pd.isna(countries)]))
-    n_countries = len(country_list)
-    
-    # Empty array (n_grids, n_bands) to store the sum of weighted emissions per band
-    band_emissions = np.zeros((n_receptors, n_bands))
-
-    # Empty array (n_grids, n_bands) to store the counts of emissions sources per band
-    if return_source_counts:
-        band_source_counts = np.zeros((n_receptors, n_bands))
-    else:
-        band_source_counts = None
-    
-    country_emissions = np.zeros((n_receptors, n_bands, n_countries))
-    
-    # Mapping of country name -> source idxs
-    country_idx_dict = {r: np.where(countries == r)[0] for r in country_list}
-
-    # Loop through bands
-    for band_idx, (upper, nb_dict) in enumerate(bands_nb_dicts.items()):
-        # Flatten i (receptor) and j (source) indices to get full (i, j pairs)
-        flat_i = np.repeat(np.arange(n_receptors), [len(nbs) for nbs in nb_dict.values()])  # repeat each receptor index i for the number of neighbours (sources) j it has
-        flat_j = np.concatenate(list(nb_dict.values())).astype(int)  # stack all the lists of neighbours (j's)
-
-        if not flat_j.any():
-            continue # leave band_emissions as np.nan for receptor i with no neighbouring sources in band b
-        
-        # Vectorised displacement vectors (source -> receptor)
-        disp_vecs = coords[flat_i] - coords[flat_j]  # shape (n_pairs, 2)
-
-        # Wind vectors at sources
-        wind_vecs = np.stack([u_wind[flat_j], v_wind[flat_j]], axis=1)  # shape (n_pairs, 2)
-
-        # Dot products of the wind and displacement vectors (2-element vectors)
-        dots = np.einsum('nm,nm->n', wind_vecs, disp_vecs)  # returns column of shape (n_pairs,)
-        
-        # Divide dots by norms of wind and disp vectors to get cosine similarity
-        norm_wind = np.linalg.norm(wind_vecs, axis=1)
-        norm_disp = np.linalg.norm(disp_vecs, axis=1)
-
-        # Avoid division by zero
-        denom = norm_wind * norm_disp
-        denom[denom == 0] = 1e-8
-
-        # Get cosine similarity
-        cos_sim = dots / denom  # cosine similarity, shape (n_pairs,)
-
-        # Weight emissions by cosine similarity (with lowerbound zero to 'switch off' negative weights [downwind emissions])
-        weighted_emissions = gfed_emissions[flat_j] * np.maximum(0, cos_sim)
-
-        # Sum weighted emissions by receptor index (i), across all sources for total band emission
-        sums_total = np.bincount(flat_i, weights=weighted_emissions, minlength=n_receptors)
-        band_emissions[:, band_idx] = sums_total  # store in output array
-
-        if return_source_counts:
-            counts = np.bincount(flat_i, minlength=n_receptors) # shape (n_grids,)
-            band_source_counts[:, band_idx] = counts
-
-        # --- Sum emissions per country
-        for c_idx, c_name in enumerate(country_list):  # Loop over each source country by index and name
-            c_sources = country_idx_dict[c_name]  # Get indices of sources belonging to this country
-            in_country = np.isin(flat_j, c_sources)  # Boolean array: True where source is in the current country
-            if not np.any(in_country):  # Skip if no sources in this country for this band
-                continue
-            sums_c = np.bincount(flat_i[in_country], weights=weighted_emissions[in_country], minlength=n_receptors)  # Sum weighted emissions per receptor for this country
-            country_emissions[:, band_idx, c_idx] = sums_c  # Store summed emissions for all receptors, current band, current country
-
-    return (band_emissions, band_source_counts, country_emissions)
+    if source_groups is None:
+        return None
+    if isinstance(source_groups, str):
+        if source_groups not in source_gdf.columns:
+            raise ValueError(f"source_groups column not found: {source_groups}")
+        return np.array(source_gdf[source_groups])
+    source_groups = np.asarray(source_groups)
+    if len(source_groups) != len(source_gdf):
+        raise ValueError(
+            "source_groups must be None, a source_gdf column name, or one label per source row"
+        )
+    return source_groups
 
 
 def process_month(
-    chunk, thresholds, lower_bounds, # note thresholds/LBs must be in km!
-    bin_by_country=False # if False, bin by source regions not countries
+    chunk, thresholds, lower_bounds, # note thresholds/lowerbounds must be in km!
+    source_groups="region"
 ):
-    gdf = chunk.copy()
-
-    # Convert to GeoDataFrame
-    gdf = gpd.GeoDataFrame(
-        gdf, geometry=gpd.GeoSeries.from_wkt(gdf['geometry']),
+    # Convert global monthly source pool to GeoDataFrame. Do not filter sources to Africa:
+    # transported emissions from neighbouring continents can affect African receptors
+    source_gdf = gpd.GeoDataFrame(
+        chunk.copy(), geometry=gpd.GeoSeries.from_wkt(chunk['geometry']),
         crs='EPSG:4326'
     )
 
-    # Filter for Africa
-    gdf = gdf[gdf['continent']=='Africa'].reset_index(drop=True)
+    # Remove cells where lat is +- 90 (leads to Inf when reprojecting)
+    source_gdf = source_gdf[
+        (source_gdf["lat"] > -90)
+        & (source_gdf["lat"] < 90)
+    ].reset_index(drop=True)
 
-    # Convert to projected coords (in metres)
-    gdf_proj = gdf.to_crs(epsg=3857)
+    # Only include receptor grid cells for Africa
+    receptor_mask = source_gdf['continent'] == 'Africa'
+    receptor_gdf = source_gdf[receptor_mask].reset_index(drop=True)
 
-    # Grid cell coords (in projected CRS)
-    coords = np.array([(geom.centroid.x, geom.centroid.y) for geom in gdf_proj.geometry])
+    # Project lon/lat grid centres directly (from points); do not use polygon centroids
+    # because cells crossing the antimeridian produce invalid centroids in EPSG:3857
+    # Transform grid-cell centre coordinates to EPSG:3857 (projected coords in metres)
+    WGS84_TO_WEBMERC = Transformer.from_crs(
+        "EPSG:4326",
+        "EPSG:3857",
+        always_xy=True
+    )
+
+    source_x, source_y = WGS84_TO_WEBMERC.transform(
+        source_gdf["lon"].to_numpy(),
+        source_gdf["lat"].to_numpy()
+    )
+    source_coords = np.column_stack((source_x, source_y))
+
+    receptor_x, receptor_y = WGS84_TO_WEBMERC.transform(
+        receptor_gdf["lon"].to_numpy(),
+        receptor_gdf["lat"].to_numpy()
+    )
+    receptor_coords = np.column_stack((receptor_x, receptor_y))
+    
+    # Indices of receptors (indexing source_gdf), such that they can be excluded as sources
+    receptor_source_indices = np.flatnonzero(receptor_mask.to_numpy())
 
     # Convert thresholds/lowerbounds to metres
     thresholds_m = np.array(thresholds) * 1e3
     lower_bounds_m = np.array(lower_bounds) * 1e3
 
-    # Arrays of u and v 10m wind components
-    u_wind = np.array(gdf_proj['u10'])
-    v_wind = np.array(gdf_proj['v10'])
-
-    # GFED emissions
-    # gfed_emissions = np.array(gdf_proj['gfed_PM25'])
-    gfed_emissions = np.array(gdf_proj['gfed_PM25_mass_emis'])  # NOTE 20/10: using emissions mass (g PM2.5 per month) instead of mass flux (mass per area)
-
-    # Get neighbour dictionaries for each band
-    bands_nb_dicts = distanceband_neighbours(coords, thresholds_m, lower_bounds_m)
-
-    # Bin neighbouring emissions into upwind/downwind sources
-    if bin_by_country:
-        band_emissions, band_source_counts, country_emissions = sum_wind_weighted_emissions_by_country(
-            coords, u_wind, v_wind, gfed_emissions, bands_nb_dicts,
-            countries=np.array(gdf_proj['country']),
-            return_source_counts=True
-        )
-    else: # source emissions by region
-        band_emissions, band_source_counts, region_emissions = sum_wind_weighted_emissions_by_region(
-            coords, u_wind, v_wind, gfed_emissions, bands_nb_dicts,
-            regions=np.array(gdf_proj['region']),
-            return_source_counts=True
-        )
-
-    # Convert binned neighbouring emissions back to tabular data
-    emissions_df = pd.DataFrame(
-        band_emissions[:, :],
-        columns=[
-            f"emis_{lower_bounds[b]}_{thresholds[b]}km"
-            for b in range(len(thresholds))
-        ]
+    # 1. Find source-receptor pairs for each distance band
+    band_pairs = find_distanceband_sources(
+        receptor_coords, source_coords, thresholds_m, lower_bounds_m,
+        receptor_source_indices=receptor_source_indices
     )
 
-    # Convert binned emissions source counts back to tabular data
-    source_counts_df = pd.DataFrame(
-        band_source_counts[:, :],
-        columns=[
-            f"N_sources_{lower_bounds[b]}_{thresholds[b]}km"
-            for b in range(len(thresholds))
-        ]
+    # 2. Aggregate total emissions by band, then optionally decompose those same
+    #    weighted source-receptor pairs by source group (e.g., region)
+    source_group_labels = resolve_source_groups(source_gdf, source_groups)
+    band_emissions, band_source_counts, group_emissions, group_list = (
+        sum_wind_weighted_emissions(
+            receptor_coords,
+            source_coords,
+            u_wind=np.array(source_gdf['u10']),
+            v_wind=np.array(source_gdf['v10']),
+            gfed_emissions=np.array(source_gdf['gfed_PM25_mass_emis']),
+            band_pairs=band_pairs,
+            source_groups=source_group_labels,
+            return_source_counts=True
+        )
     )
 
-    if bin_by_country:
-        # Convert country-binned emissions (receptor × band × country) back to tabular data
-        country_list = sorted(gdf_proj['country'].dropna().unique())  # Get sorted list of unique country names (same order as in sum_wind_weighted_emissions_by_country())
-        country_colnames = [
-            f"emis_{lower_bounds[b]}_{thresholds[b]}km_{country_list[r]}"  # Column names for each band–country combination
-            for b in range(len(thresholds))
-            for r in range(len(country_list))  # cols are band0_country0, band0_country1, band0_country2, ..., band1_country0, band1_country1, band1_country2, ... etc. (i.e., unnest country index fastest)
-        ]
-        country_emissions_flat = country_emissions.reshape(coords.shape[0], -1)  # Reshape from (N, B, R) to (N, B×R) -- unnests the last index (country) fastest
-        country_emissions_df = pd.DataFrame(country_emissions_flat, columns=country_colnames)  # Create DataFrame with descriptive column names
+    # Convert to tabular data
+    emissions_df = make_band_dataframe(band_emissions, "emis", thresholds, lower_bounds)
+    source_counts_df = make_band_dataframe(
+        band_source_counts, "N_sources", thresholds, lower_bounds
+    )
+    group_emissions_df = make_group_band_dataframe(
+        group_emissions, group_list, thresholds, lower_bounds
+    )
 
-        # Horizontal append emissions cols onto gdf (original CRS)
-        gdf = pd.concat(
-            [gdf, emissions_df, source_counts_df, country_emissions_df],
-            axis=1
-        )
+    # Horizontal concat emissions cols onto gdf (original CRS)
+    # Returns gdf with monthly transported emissions for each band
+    return pd.concat(
+        [receptor_gdf, emissions_df, source_counts_df, group_emissions_df],
+        axis=1
+    )
 
-        return gdf  # gdf with monthly transported emissions for each band
-    
-    else:
-        # Convert region-binned emissions (receptor × band × region) back to tabular data
-        region_list = sorted(gdf_proj['region'].dropna().unique())  # Get sorted list of unique region names (same order as in sum_wind_weighted_emissions_by_region())
-        region_colnames = [
-            f"emis_{lower_bounds[b]}_{thresholds[b]}km_{region_list[r]}"  # Column names for each band–region combination
-            for b in range(len(thresholds))
-            for r in range(len(region_list))  # cols are band0_region0, band0_region1, band0_region2, ..., band1_region0, band1_region1, band1_region2, ... etc. (i.e., unnest region index fastest)
-        ]
-        region_emissions_flat = region_emissions.reshape(coords.shape[0], -1)  # Reshape from (N, B, R) to (N, B×R) -- unnests the last index (region) fastest
-        region_emissions_df = pd.DataFrame(region_emissions_flat, columns=region_colnames)  # Create DataFrame with descriptive column names
-
-        # Horizontal append emissions cols onto gdf (original CRS)
-        gdf = pd.concat(
-            [gdf, emissions_df, source_counts_df, region_emissions_df],
-            axis=1
-        )
-
-        return gdf  # gdf with monthly transported emissions for each band
 
 def main():
     # Create the output dir if it doesn't exist
     if not os.path.exists(OUT_PATH):
         os.makedirs(OUT_PATH, exist_ok=True)
 
-    # Get the task ID from the SLURM array task ID environment variable -- CHRIS NOTE 26/08: I would have preferred to do this (parallel across years) but SLURM queue was too long to submit batch job (so just ran in interactive terminal).
+    # Get the task ID from the SLURM array task ID environment variable 
     task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
 
     # The years correspond to task IDs (0-19 corresponds to 2000-2019)
     year = 2000 + task_id
 
-    ### --- Load data ---
+    # -----------------------------------------------------
+    # Load data
+    # -----------------------------------------------------
     print("Loading data...", flush=True)
     
     # Monthly Xu, GFED, ERA5 CSV files (with gridcell WKT geometries)
     df = pd.read_csv(
-        os.path.join(INPUT_DATA_DIR, f"monthly_xu_pm25_gfed_gfa_era5_{year}.csv")
+        os.path.join(INPUT_DATA_DIR, f"monthly_xu_pm25_gfed_era5_{year}.csv")
     )
 
-    # Load nat bounds and filter for Africa
+    # Load nat bounds. Keep all countries so non-African source cells can be labelled
+    # and included when they fall inside a receptor distance band
     nat_bounds = gpd.read_file(NAT_BOUNDS_PATH).rename(
         columns={"CONTINENT": "continent", "WB_NAME": "country", "SUBREGION": "region"} # rename columns from shapefile
     )
-    nat_bounds = nat_bounds[nat_bounds['continent']=='Africa']
 
-    ### Join nat bounds onto df using area_join
+    # Join nat bounds onto df using area_join
     gdf_month_0 = gpd.GeoDataFrame( # create geodataframe from 1 month of data (do area_join for 1 month, then use regular joins by lon, lat for speed. because lon, lat are repeated for each month)
         df[df['month']==0], 
         geometry=gpd.GeoSeries.from_wkt(df[df['month']==0].geometry),
@@ -438,22 +394,24 @@ def main():
     )
     df = df.merge(gdf_month_0[['lon', 'lat', 'ISO_A3', 'country', 'region', 'continent']]) # regular join country info onto df
 
-    ### --- Compute surrounding wind weighted emissions by month ---
+    # -----------------------------------------------------
+    # Compute surrounding wind weighted emissions by month
+    # -----------------------------------------------------
     tqdm.pandas()
 
     # Split df into monthly chunks
     chunks = [ df[df['month']==m] for m in range(0, 12) ]
 
-    # Process data (compute monthly wind-weighted neighbour emissions) in parallel using Dask.delayed
+    # Process data (compute monthly wind-weighted neighbour emissions)
     print("Computing transported emissions by month...", flush=True)
     results = [ 
         process_month(
-            chunk, thresholds, lower_bounds, bin_by_country=BIN_BY_COUNTRY
+            chunk, THRESHOLDS, LOWER_BOUNDS, source_groups=SOURCE_GROUPS
         ) for chunk in tqdm(chunks, total=len(chunks))
     ]
     # delayed_results = [
     #     dask.delayed(process_month)(
-    #         chunk, thresholds, lower_bounds, nat_bounds
+    #         chunk, THRESHOLDS, LOWER_BOUNDS, nat_bounds
     #     ) for chunk in chunks
     # ]
 
@@ -464,7 +422,9 @@ def main():
     # Concat monthly chunks to annual GeoDataFrame
     year_gdf = pd.concat(results).reset_index(drop=True)
 
-    ### --- Convert to DataFrame and write CSV ---
+    # -----------------------------------------------------
+    # Convert to dataframe and write CSV
+    # -----------------------------------------------------
     year_gdf = pd.DataFrame(year_gdf)
     year_gdf['geometry'] = year_gdf['geometry'].apply(lambda geom: geom.wkt)
 
@@ -478,3 +438,4 @@ if __name__ == "__main__":
     print("Starting...", flush=True)
     main()
     print("Done!", flush=True)
+

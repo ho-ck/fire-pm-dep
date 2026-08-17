@@ -367,3 +367,27 @@ plot_map <- function(
 
     return(p)
 }
+
+# Kernel density 'histogram'
+density_plot <- function(data, variable, 
+                         from = NULL, to = NULL,
+                         palette = "YlOrRd", direction = 1 ) {
+    
+    x <- data[[variable]]
+    dens_args <- list(x = x, n = 2^12)  
+    if (!is.null(from)) { dens_args$from <- from }
+    if (!is.null(to))   { dens_args$to   <- to }
+    y <- do.call(density, dens_args)
+    
+    ggplot(
+        data.frame(X = y$x, density = y$y), aes(x = X, y = density)
+    ) + 
+        geom_line(color = "black", linewidth = 1) + 
+        geom_segment(
+            aes(x = X, xend = X, 
+                y = density, yend = 0, colour = X),
+            show.legend = FALSE
+        ) + 
+        scale_color_distiller(palette = palette, direction = direction)
+
+}

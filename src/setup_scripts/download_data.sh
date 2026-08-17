@@ -6,7 +6,8 @@
 #SBATCH --qos=long
 #SBATCH --time=32:00:00
 #SBATCH --mem=16G
-#SBATCH --array=5 # temp 06/07/2026: just downloading worldpop age-sex 
+#SBATCH --array=0-16, 
+#       --array=5 # temp 06/07/2026: just downloading worldpop age-sex 
 #       --array=0-15    # (there are 16 datasets)
 
 ###############################################################################
@@ -26,10 +27,12 @@ cd ~/fire-pm-dep/
 ###############################################################################
 # Datasets
 #
-# Same order as the DATASETS dictionary in download.py
+# Names match keys in DATASETS in download_data.py
+# Slurm array size (--array=0-N) should equal len(DATASETS) - 1.
 ###############################################################################
 
 DATASETS=(
+    hu_annual
     xu_annual
     xu_monthly
     adm0
@@ -76,7 +79,8 @@ echo "Host:      $(hostname)"
 echo "Log file:  ${LOGFILE}"
 echo "=============================================================="
 
-python src/setup_scripts/download_data.py \
+# python src/setup_scripts/download_data.py \
+python src/setup_scripts/download_data_2000_2022.py \
     --dataset "${DATASET}"
 
 EXIT_CODE=$?

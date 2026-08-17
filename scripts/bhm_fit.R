@@ -61,8 +61,19 @@ scale_prior_dist <- cfg$priors$scale_dist
 
 # --- Load data ----------------------------------------------------------------
 logging("Loading data...")
-df <- readr::read_csv(data_filepath) %>% 
-    filter(year <= 2017)    # 2000-2017 time period of SE indicators
+df <- readr::read_csv(data_filepath) |>
+    filter(year <= cfg$data$max_year) |>
+    group_by(lon, lat) |>
+    mutate(grid_id = cur_group_id()) |> # create grid_id for projecting SE vars
+    ungroup()
+
+# --- Project indicators forward (optional) ------------------------------------
+if (!is.null(cfg$data$indicator_projections)) {
+    logging("Projecting socioeconomic indicators forward...")
+    df <- project_indicators(df, cfg$data$indicator_projections)
+} else {
+    logging("No indicator projections specified in config — skipping.")
+}
 
 # --- Do PCA -------------------------------------------------------------------
 logging("Computing PCA...")
@@ -82,7 +93,8 @@ pca_res <- compute_pca(
 df_aug <- pca_res$data
 
 # Save PCA loadings & variance explained
-save_pca_res( pca_res$pca, cfg$pca$method, cfg$project$model_save_dir )
+save_pca_res(pca_res$pca, cfg$pca$method, cfg$pca$n_pcs,
+             cfg$project$model_save_dir )
 
 # --- Prepare data for model ---------------------------------------------------
 data_mod <- prepare_model_data(df_aug, 
@@ -92,6 +104,9 @@ data_mod <- prepare_model_data(df_aug,
                                centre_year    = cfg$data$centre_year,
                                scale_y        = cfg$data$scale_y
                                )
+# Chris temp 17/07: check how many rows for 2-variable PCA index data
+print("Dataset size:")
+print(dim(data_mod))
 
 # --- Priors -------------------------------------------------------------------
 prior   <- build_priors(beta_prior_sd, scale_prior_dist)
@@ -105,8 +120,10 @@ outfile <- build_modelfile(
     outcome     = cfg$model$outcome,
     scale_y     = cfg$data$scale_y,
     pca_method  = cfg$pca$method,
+    n_pcs       = cfg$pca$n_pcs,    
     mcmc_cfg    = cfg$mcmc,
-    priors_cfg  = cfg$priors
+    priors_cfg  = cfg$priors,
+    max_year    = cfg$data$max_year
 )
 
 brm_model <- brms::brm(

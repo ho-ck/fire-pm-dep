@@ -1,0 +1,19 @@
+project:
+  emis_data_dir: "/work/scratch-pw5/cho00/data/spatial/fire_pm_dep_paper_data/transported_GFED_emissions_incl_global_2000_2023" # emissions data dir (including non-Africa sources, 2000-2023 GFED)
+  se_data_filepath: "/work/scratch-pw5/cho00/data/spatial/fire_pm_dep_paper_data/proc_data/df_af_annual_2000_2023.csv"          # socioeconomic and PM (Hu 2000-2023) data
+  model_filepath: "/work/scratch-pw5/cho00/data/spatial/transported_pm_inla/inla_model_hu.rds"
+  out_data_filepath: "/work/scratch-pw5/cho00/data/spatial/fire_pm_dep_paper_data/proc_data/df_af_annual_loc_tp_2000_2023.csv"  # path to save the resulting df with PM, SE indicators, + local & transported PM
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/inla/share/proj"
+
+data:
+  years: { start: 2000, end: 2023 }
+  outcome: "fire_PM25_hu"
+  # adj_path: "/work/scratch-pw5/cho00/data/spatial/transported_pm_inla/afr.adj"  # path to adjacency matrix
+  se_indicators:
+    - "edu_mean_years"
+    - "imp_san_access_pct"
+    - "log_GDP_pc"
+    - "stunting_pct_u5"
+    - "child_dep_pct"

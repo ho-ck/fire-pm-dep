@@ -6,9 +6,9 @@
 #SBATCH --qos=high
 #SBATCH --time=04:00:00
 #SBATCH --mem=512G
-#SBATCH --array=0-19
+#SBATCH --array=0-23
 
-# SLURM_ARRAY_TASK_ID are array job task IDs (0-19, representing years 2000-2019)
+# SLURM_ARRAY_TASK_ID are array job task IDs (0-23, representing years 2000-2023)
 
 # Source .bashrc to initialize Conda and environment variables
 source ~/.bashrc
@@ -19,7 +19,6 @@ conda activate pm
 
 # Navigate to project directory
 cd ~/fire-pm-dep/
-
 
 # Logging directory
 LOGDIR="logs/setup_scripts"

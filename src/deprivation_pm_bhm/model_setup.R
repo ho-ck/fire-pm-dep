@@ -31,7 +31,7 @@ build_priors <- function(beta_sd, scale_type) {
 
 # --- Helper: file name builder ------------------------------------------------
 build_modelfile <- function(out_path, outcome, scale_y, model_name, pca_method,
-                            mcmc_cfg, priors_cfg) {
+                            n_pcs, mcmc_cfg, priors_cfg, max_year=2017) {
     file.path(
         out_path,
         paste0(
@@ -39,6 +39,8 @@ build_modelfile <- function(out_path, outcome, scale_y, model_name, pca_method,
             outcome, "_",
             "scaley", scale_y, "_",
             pca_method, "PcaMethod_",
+            n_pcs, "pcs_",
+            "maxYear", max_year, "_",
             mcmc_cfg$chains, "chains_",
             mcmc_cfg$iter, "iter_",
             mcmc_cfg$warmup, "warmup_",

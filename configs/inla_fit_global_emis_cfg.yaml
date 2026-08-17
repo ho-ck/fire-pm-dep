@@ -1,0 +1,12 @@
+project:
+  emis_data_dir: "/work/scratch-pw5/cho00/data/spatial/fire_pm_dep_paper_data/transported_GFED_emissions_incl_global"  # emissions data dir (including non-Africa sources)
+  model_filepath: "/work/scratch-pw5/cho00/data/spatial/transported_pm_inla/inla_model_global_emis.rds"
+
+environment:
+  proj_data: "/home/users/cho00/miniconda3/envs/inla/share/proj"
+
+data:
+  years: { start: 2000, end: 2017 }
+  outcome: "fire_PM25"
+  adj_path: "/work/scratch-pw5/cho00/data/spatial/transported_pm_inla/afr.adj"  # path to adjacency matrix
+
