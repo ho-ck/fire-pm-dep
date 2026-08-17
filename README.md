@@ -1,5 +1,5 @@
 # fire-pm-dep
-Analysis for paper: Heterogeneous patterns of deprivation and fire-related air pollution exposure in Africa.
+Analysis for paper:  *Socioeconomic inequalities in exposure to local and transported fire-related air pollution across Africa*.
 
 Setup scripts (`src/setup_scripts/`):
 
