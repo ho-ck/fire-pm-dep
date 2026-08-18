@@ -24,3 +24,5 @@ Analysis scripts/notebooks:
 
 
 **Chris note 17/08: maybe to generate CSV of INLA regression coefficients and country-specific deprivation coefficients from BHM**
+
+**Chris note 18/08: to remove `outputs/` from `main` as it is not being used anymore, and to remove config files for models not included in the paper**
